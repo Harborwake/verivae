@@ -6,9 +6,11 @@ Verivae is an AI-assisted financial safety app from Harborwake for checking scam
 
 This repository is currently the planning and MVP build home for Verivae. The app has not been coded yet. Before building, read the planning docs in this order:
 
-1. [Verivae Codex Build Handoff - MVP 1](docs/Verivae-Codex-Build-Handoff-MVP-1.md)
-2. [Verivae Product Safety Boundaries](docs/Product-Safety-Boundaries.md)
-3. [Verivae MVP Feature Checklist](docs/MVP-Feature-Checklist.md)
+1. [Verivae Codex Kickoff Prompt](docs/Codex-Kickoff-Prompt.md)
+2. [Verivae Docs Guide](docs/README.md)
+3. [Verivae Codex Build Handoff - MVP 1](docs/Verivae-Codex-Build-Handoff-MVP-1.md)
+4. [Verivae Product Safety Boundaries](docs/Product-Safety-Boundaries.md)
+5. [Verivae MVP Feature Checklist](docs/MVP-Feature-Checklist.md)
 
 ## MVP Focus
 
@@ -21,5 +23,5 @@ Verivae should help users pause, understand risk, preserve evidence, and choose 
 ## Current Repo Status
 
 - Planning docs are in the `docs` folder.
-- MVP build Issues are in the GitHub Issues tab.
+- MVP build Issues and future backlog Issues are in the GitHub Issues tab.
 - No production app code has been added yet.
