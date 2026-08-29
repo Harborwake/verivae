@@ -20,6 +20,10 @@ This folder contains the planning documents Codex should read before building Ve
 
    This is the beginner-friendly task checklist for the first build. It matches the GitHub Issues used to organize MVP work.
 
+5. [Verivae Architecture Notes](Architecture-Notes.md)
+
+   This explains how Codex should keep the first build organized so future mobile, browser-extension, and desktop work can reuse the same scam-checking foundation.
+
 ## Build Rule
 
 Codex should build the smallest useful version first. Future features such as Gmail review, text-message review, QR scanning, attachment review, device checks, weekly deep checks, paid plans, browser-extension protection, and deeper recovery tools should stay in backlog until the manual scam-check MVP works well.
