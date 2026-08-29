@@ -32,7 +32,7 @@ Status: Not started. Show a risk level, reasons, what not to do, safe verificati
 
 ## Evidence Vault
 
-Status: Not started. Let the user save a check result with original content, risk level, reasons, user notes, and recovery suggestions. For MVP 1, local storage is acceptable unless a backend is approved later.
+Status: Not started. Let the user save a check result with original content, risk level, reasons, user notes, and recovery suggestions. For MVP 1, this should be prototype-only local storage unless a backend is approved later. The interface should warn users not to save passwords, one-time codes, full card numbers, bank login details, private keys, recovery phrases, or other sensitive secrets.
 
 ## Recovery Workspace
 
