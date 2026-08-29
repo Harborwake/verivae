@@ -10,7 +10,7 @@ This folder contains the planning documents Codex should read before building Ve
 
 2. [Verivae Codex Build Handoff - MVP 1](Verivae-Codex-Build-Handoff-MVP-1.md)
 
-   This is the main starting document for Codex. It explains what the first useful version should include and what should stay out of MVP 1.
+   This is the main starting document for Codex. It explains what the first useful version should include, what should stay out of MVP 1, and how the app should keep scam-checking logic reusable for future mobile, browser-extension, and desktop experiences.
 
 3. [Verivae Product Safety Boundaries](Product-Safety-Boundaries.md)
 
@@ -22,4 +22,4 @@ This folder contains the planning documents Codex should read before building Ve
 
 ## Build Rule
 
-Codex should build the smallest useful version first. Future features such as Gmail review, text-message review, QR scanning, attachment review, device checks, weekly deep checks, paid plans, and deeper recovery tools should stay in backlog until the manual scam-check MVP works well.
+Codex should build the smallest useful version first. Future features such as Gmail review, text-message review, QR scanning, attachment review, device checks, weekly deep checks, paid plans, browser-extension protection, and deeper recovery tools should stay in backlog until the manual scam-check MVP works well.
