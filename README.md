@@ -11,6 +11,7 @@ This repository is currently the planning and MVP build home for Verivae. The ap
 3. [Verivae Codex Build Handoff - MVP 1](docs/Verivae-Codex-Build-Handoff-MVP-1.md)
 4. [Verivae Product Safety Boundaries](docs/Product-Safety-Boundaries.md)
 5. [Verivae MVP Feature Checklist](docs/MVP-Feature-Checklist.md)
+6. [Verivae Architecture Notes](docs/Architecture-Notes.md)
 
 ## MVP Focus
 
