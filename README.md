@@ -16,6 +16,10 @@ This repository is currently the planning and MVP build home for Verivae. The ap
 
 The first working version should focus on a mobile-first manual scam check experience. A user should be able to enter a suspicious message, email, link, payment request, QR situation, attachment concern, or short situation summary; receive an explainable risk result; save useful evidence; and follow recovery guidance when needed.
 
+## Cross-Device Direction
+
+Verivae should eventually support both mobile users and desktop/laptop users. A future browser extension can help check suspicious websites, email pages, login pages, payment pages, downloads, popups, and links. MVP 1 should not build the extension yet, but the scam-checking logic should be organized so it can be reused later.
+
 ## Important Safety Boundary
 
 Verivae should help users pause, understand risk, preserve evidence, and choose safer next steps. It must not promise perfect scam detection, guaranteed refunds, legal outcomes, account recovery, device cleanup, or complete virus removal.
