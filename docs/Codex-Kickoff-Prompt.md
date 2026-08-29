@@ -29,7 +29,9 @@ The first version should be a mobile-first web app prototype focused on:
 - settings and privacy screen
 - full MVP flow testing
 
-Do not build real Gmail, Messages, banking, payment app, antivirus, device-scanning, subscription, or law-enforcement integrations yet. Those are future backlog items.
+Design the app so the scam-checking logic can later be reused by a mobile app, browser extension, and desktop web dashboard. Keep detection/risk logic separate from the visual screens.
+
+Do not build real Gmail, Messages, banking, payment app, antivirus, browser-extension, device-scanning, subscription, or law-enforcement integrations yet. Those are future backlog items.
 
 Use realistic simulated logic for the first version. The app should look and behave like a real product, but it should stay small enough to finish and test.
 
