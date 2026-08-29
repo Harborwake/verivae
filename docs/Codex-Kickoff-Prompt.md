@@ -13,6 +13,20 @@ Before writing code, read these repo files in this order:
 3. docs/Verivae-Codex-Build-Handoff-MVP-1.md
 4. docs/Product-Safety-Boundaries.md
 5. docs/MVP-Feature-Checklist.md
+6. docs/Architecture-Notes.md
+
+## Non-Negotiables
+
+These rules must guide the first build:
+
+- Build MVP 1 only. Do not build the full future product yet.
+- Start with a mobile-first web app prototype.
+- Keep scam-checking logic separate from visual screens so it can later support a mobile app, browser extension, and desktop web dashboard.
+- Do not build real Gmail, Messages, banking, payment app, antivirus, browser-extension, device-scanning, subscription, or law-enforcement integrations yet.
+- Do not ask users to enter passwords, one-time codes, full card numbers, bank login details, private keys, recovery phrases, or other sensitive secrets.
+- Do not promise perfect scam detection, guaranteed refunds, legal outcomes, account recovery, device cleanup, or complete virus removal.
+- Always include a not-enough-information path when the app cannot judge safely.
+- Keep the app calm, clear, nonjudgmental, and understandable to non-technical users.
 
 Build only MVP 1 for now. Do not try to build the entire long-term product.
 
