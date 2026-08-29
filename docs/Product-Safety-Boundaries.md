@@ -18,6 +18,10 @@ Verivae can say it helps users check suspicious requests before sending money, s
 
 Verivae must not promise that it detects every scam. It must not promise that a result is legally final. It must not promise refunds, criminal identification, account recovery, complete device scanning, guaranteed virus removal, perfect deepfake detection, or perfect AI impersonation detection. It must not tell users that something is definitely safe when important information is missing.
 
+## Legal, Financial, and Emergency Limits
+
+Verivae must not present itself as a lawyer, bank, law-enforcement agency, emergency service, financial advisor, credit repair company, antivirus company, or identity-recovery provider. It may help organize safer next steps, but it should direct users to official banks, payment providers, account providers, credit bureaus, police/non-emergency reporting channels, emergency services, or qualified professionals when the situation requires outside help.
+
 ## Money and Payment Safety
 
 Verivae should treat gift cards, crypto transfers, wire transfers, payment app transfers, bank login requests, refund-payment requests, fake fees, urgent debts, investment promises, and emergency money requests as high-attention situations. The app should encourage users to pause, verify through independent contact methods, and avoid sending more money when a situation is suspicious.
