@@ -10,6 +10,12 @@ This handoff document turns the master design brief into a focused starting pack
 
 Verivae is a money and scam protection app created under Harborwake. The first version should help a user pause before doing something risky, such as sending money, sharing a login code, clicking a suspicious link, scanning a payment QR code, opening an attachment, installing remote-access software, or trusting a person who may be impersonating someone else. The app should not act like magic. It should calmly help the user check the situation, explain the risk, preserve useful evidence, and choose a safer next step.
 
+## Cross-Device Product Direction
+
+Verivae should eventually support both mobile users and non-mobile users. The mobile app should focus on phone-centered risks such as texts, calls, QR codes, screenshots, payment requests, device-safety guidance, and recovery help. A future browser extension should focus on desktop and laptop risks such as suspicious websites, email pages, login pages, payment pages, downloads, popups, and links.
+
+MVP 1 should not build both platforms at once. Instead, the first build should keep the scam-checking logic separate from the screen layout so the same core reasoning can later support the mobile app, browser extension, and desktop web dashboard without rebuilding the product from scratch.
+
 ## Primary Build Principle
 
 The first version should prioritize the before-action scam check. The app is most valuable when it interrupts the moment before harm happens. Recovery features, device checks, family/helper review, education, and account protection should support that core moment instead of making the first version too broad.
@@ -21,6 +27,12 @@ The MVP should include a clean mobile-first web app or app prototype that can la
 ## Recommended Starting Platform
 
 Start with a mobile-first web app unless a later decision chooses native iOS or Android. A mobile-first web app is easier to build, test, and improve early. It can still be designed to feel like a phone app. Later, the product can move into native mobile development when Gmail, Messages, device scanning, notifications, and operating-system permissions become important.
+
+## MVP Architecture Direction
+
+Keep the scam-checking logic reusable. The screens should call a separate detection layer instead of hiding all risk rules inside the visual components. That detection layer should accept a check item, inspect the user-provided content and context, and return a structured result with risk level, detected signals, explanation, missing information, and recommended next steps.
+
+This matters because the same detection layer should later be usable by the mobile app, a browser extension, and a desktop web dashboard. MVP 1 does not need a complex shared package yet, but the code should be organized so future platform work does not require starting over.
 
 ## MVP Screens
 
@@ -64,7 +76,7 @@ The app should ask for the smallest amount of information needed to help. The fi
 
 ## First-Version Integration Policy
 
-Do not build real Gmail, Messages, banking, payment-app, antivirus, or device-scanning integrations in MVP 1 unless the user specifically approves that later. For MVP 1, represent these as future-ready sections, mock states, or manual import flows. This keeps the first build achievable and avoids risky permission work too early.
+Do not build real Gmail, Messages, banking, payment-app, antivirus, browser-extension, or device-scanning integrations in MVP 1 unless the user specifically approves that later. For MVP 1, represent these as future-ready sections, mock states, or manual import flows. This keeps the first build achievable and avoids risky permission work too early.
 
 ## Detection Behavior
 
@@ -92,11 +104,11 @@ A user can open the app and start a manual scam check from the home screen. A us
 
 ## Suggested First Codex Prompt
 
-Build MVP 1 for Harborwake's Verivae money/scam protection app using this handoff document as the main build source. Do not build the entire master brief yet. Start with a mobile-first app experience focused on manual scam checks, explainable results, evidence vault, recovery workspace, trusted helper summary, education, and settings. Use simulated detection logic for now, but make the user flows, screens, states, and data model realistic enough to test. Keep the app name as Verivae. Harborwake is the company name. Do not add real Gmail, Messages, banking, payment, antivirus, or device-scanning integrations yet. Build the first useful version, verify it works, and keep privacy and safety boundaries visible in the product.
+Build MVP 1 for Harborwake's Verivae money/scam protection app using this handoff document as the main build source. Do not build the entire master brief yet. Start with a mobile-first app experience focused on manual scam checks, explainable results, evidence vault, recovery workspace, trusted helper summary, education, and settings. Use simulated detection logic for now, but make the user flows, screens, states, and data model realistic enough to test. Keep the app name as Verivae. Harborwake is the company name. Do not add real Gmail, Messages, banking, payment, antivirus, browser-extension, or device-scanning integrations yet. Build the first useful version, verify it works, and keep privacy and safety boundaries visible in the product.
 
 ## Implementation Notes for Codex
 
-Create a small, understandable project structure. Keep the first build easy to run locally. Use readable component names. Keep detection logic separate from screen layout so it can be improved later. Use sample scam scenarios for testing. Include empty states, loading states, error states, and not-sure states. Store prototype evidence entries in a simple local state or local storage unless a backend is approved later. Make sure the app works on phone-sized screens first.
+Create a small, understandable project structure. Keep the first build easy to run locally. Use readable component names. Keep detection logic separate from screen layout so it can be improved later and reused across future mobile, browser-extension, and desktop experiences. Use sample scam scenarios for testing. Include empty states, loading states, error states, and not-sure states. Store prototype evidence entries in a simple local state or local storage unless a backend is approved later. Make sure the app works on phone-sized screens first.
 
 ## Suggested Data Objects
 
@@ -108,7 +120,7 @@ Gift card request from someone claiming to be a boss. Bank warning text asking f
 
 ## Out of Scope for MVP 1
 
-Real email inbox scanning is out of scope. Real SMS or iMessage access is out of scope. Real bank or payment app connection is out of scope. Real antivirus scanning is out of scope. Real law enforcement reporting automation is out of scope. Real identity verification is out of scope. Paid subscription flows are out of scope unless approved later. These can be designed later after the first working version proves the core experience.
+Real email inbox scanning is out of scope. Real SMS or iMessage access is out of scope. Real bank or payment app connection is out of scope. Real antivirus scanning is out of scope. Real browser-extension protection is out of scope. Real law enforcement reporting automation is out of scope. Real identity verification is out of scope. Paid subscription flows are out of scope unless approved later. These can be designed later after the first working version proves the core experience.
 
 ## Build Order
 
