@@ -1,0 +1,614 @@
+[
+  {
+    "id": "church-unfamiliar-donation-context",
+    "category": "charity",
+    "title": "Unfamiliar church caller with donation context",
+    "expectedRiskLevel": "caution",
+    "expectedSignals": ["impersonation", "unexpected_donation"],
+    "input": {
+      "sourceType": "",
+      "requestedAction": "",
+      "content": "Someone named Jenny called me claiming to be from the church I go to, but I don't know anyone named Jenny, and the church doesn't normally ask for donations."
+    }
+  },
+  {
+    "id": "church-direct-zelle-donation",
+    "category": "charity",
+    "title": "Direct church donation request through Zelle",
+    "expectedRiskLevel": "high_risk",
+    "expectedSignals": ["unusual_payment", "unexpected_donation"],
+    "input": {
+      "sourceType": "",
+      "requestedAction": "",
+      "content": "Pastor Mike texted from a new number asking me to donate by Zelle right now for an emergency church fund and not mention it yet."
+    }
+  },
+  {
+    "id": "school-fundraiser-official",
+    "category": "low_risk",
+    "title": "Official optional school fundraiser",
+    "expectedRiskLevel": "likely_safe",
+    "expectedSignals": [],
+    "input": {
+      "sourceType": "",
+      "requestedAction": "",
+      "content": "The school newsletter says the fundraiser link is on the official school website and donations are optional at the front office."
+    }
+  },
+  {
+    "id": "landlord-new-wire-account",
+    "category": "payment_change",
+    "title": "Landlord changed wire destination",
+    "expectedRiskLevel": "high_risk",
+    "expectedSignals": ["payment_destination_change"],
+    "input": {
+      "sourceType": "",
+      "requestedAction": "",
+      "content": "My landlord emailed that rent must be wired today to a new bank account because the old one is frozen."
+    }
+  },
+  {
+    "id": "boss-vendor-bank-change",
+    "category": "business_email",
+    "title": "Boss asks for vendor bank change",
+    "expectedRiskLevel": "high_risk",
+    "expectedSignals": ["payment_destination_change"],
+    "input": {
+      "sourceType": "",
+      "requestedAction": "",
+      "content": "My boss says the vendor account changed and I should use the replacement wire instructions immediately."
+    }
+  },
+  {
+    "id": "family-new-phone-cash-app",
+    "category": "family_emergency",
+    "title": "New-number family Cash App request",
+    "expectedRiskLevel": "high_risk",
+    "expectedSignals": ["relationship_pressure", "unusual_payment"],
+    "input": {
+      "sourceType": "",
+      "requestedAction": "",
+      "content": "Mom it's me, this is my new number. I am in an emergency and need you to Cash App me money right now."
+    }
+  },
+  {
+    "id": "facebook-reset-code",
+    "category": "account_access",
+    "title": "Friend asks for Facebook reset code",
+    "expectedRiskLevel": "high_risk",
+    "expectedSignals": ["code_request"],
+    "input": {
+      "sourceType": "",
+      "requestedAction": "",
+      "content": "A friend says they accidentally sent their Facebook reset code to my phone and needs me to read back the login code."
+    }
+  },
+  {
+    "id": "apple-id-locked-link",
+    "category": "account_access",
+    "title": "Apple ID locked link",
+    "expectedRiskLevel": "high_risk",
+    "expectedSignals": ["identity_verification", "suspicious_link"],
+    "input": {
+      "sourceType": "",
+      "requestedAction": "",
+      "content": "Apple security notice says my Apple ID is locked and I need to verify at http://appleid-security-help.com today."
+    }
+  },
+  {
+    "id": "dentist-appointment-reminder",
+    "category": "low_risk",
+    "title": "Ordinary dentist appointment reminder",
+    "expectedRiskLevel": "likely_safe",
+    "expectedSignals": [],
+    "input": {
+      "sourceType": "",
+      "requestedAction": "",
+      "content": "My dentist office texted to remind me that my appointment is Tuesday at 2 pm. No payment or account information is requested."
+    }
+  },
+  {
+    "id": "marketplace-venmo-overpayment",
+    "category": "marketplace",
+    "title": "Marketplace overpayment through Venmo",
+    "expectedRiskLevel": "high_risk",
+    "expectedSignals": ["marketplace_overpayment", "unusual_payment"],
+    "input": {
+      "sourceType": "",
+      "requestedAction": "",
+      "content": "A Facebook Marketplace buyer says they overpaid by Venmo business and I need to refund the difference to a shipping agent before pickup."
+    }
+  },
+  {
+    "id": "restaurant-menu-qr",
+    "category": "low_risk",
+    "title": "Restaurant menu QR with no payment",
+    "expectedRiskLevel": "likely_safe",
+    "expectedSignals": [],
+    "input": {
+      "sourceType": "",
+      "requestedAction": "",
+      "content": "The restaurant table has a QR code for the menu only. It is not asking me to pay or sign in."
+    }
+  },
+  {
+    "id": "parking-payment-qr",
+    "category": "qr",
+    "title": "Parking payment QR pressure",
+    "expectedRiskLevel": "high_risk",
+    "expectedSignals": ["qr_payment"],
+    "input": {
+      "sourceType": "",
+      "requestedAction": "",
+      "content": "A note on the parking meter says the old machine is broken. Scan this QR code to pay the parking ticket fee immediately."
+    }
+  },
+  {
+    "id": "delivery-customs-fee",
+    "category": "delivery",
+    "title": "Delivery customs fee text",
+    "expectedRiskLevel": "high_risk",
+    "expectedSignals": ["package_fee", "suspicious_link"],
+    "input": {
+      "sourceType": "",
+      "requestedAction": "",
+      "content": "USPS says my package is held for a customs fee and I need to pay today at https://bit.ly/package-fee or delivery fails."
+    }
+  },
+  {
+    "id": "remote-job-equipment-check",
+    "category": "job",
+    "title": "Remote job equipment check",
+    "expectedRiskLevel": "high_risk",
+    "expectedSignals": ["fake_job_check"],
+    "input": {
+      "sourceType": "",
+      "requestedAction": "",
+      "content": "A remote job says I should mobile deposit a cashier's check, buy equipment from their approved vendor, and send back anything left over today."
+    }
+  },
+  {
+    "id": "crypto-recovery-upfront-fee",
+    "category": "crypto",
+    "title": "Crypto recovery upfront fee",
+    "expectedRiskLevel": "high_risk",
+    "expectedSignals": ["unusual_payment", "code_request"],
+    "input": {
+      "sourceType": "",
+      "requestedAction": "",
+      "content": "A recovery expert says they can recover my crypto if I send an upfront fee in USDT and share my private key."
+    }
+  },
+  {
+    "id": "ordinary-friend-lunch",
+    "category": "low_risk",
+    "title": "Ordinary friend lunch plan",
+    "expectedRiskLevel": "likely_safe",
+    "expectedSignals": [],
+    "input": {
+      "sourceType": "",
+      "requestedAction": "",
+      "content": "My friend asked if I want lunch Saturday at the usual place. No links, payment, passwords, or codes."
+    }
+  },
+  {
+    "id": "unclear-short-call",
+    "category": "unclear",
+    "title": "Short unclear call",
+    "expectedRiskLevel": "not_enough_information",
+    "expectedSignals": [],
+    "input": {
+      "sourceType": "",
+      "requestedAction": "",
+      "content": "Jenny called. Weird?"
+    }
+  },
+  {
+    "id": "invoice-enable-macros",
+    "category": "attachment",
+    "title": "Invoice asks to enable macros",
+    "expectedRiskLevel": "high_risk",
+    "expectedSignals": ["attachment_pressure"],
+    "input": {
+      "sourceType": "",
+      "requestedAction": "",
+      "content": "An email asks me to open the attached invoice zip file today and enable content so the document displays correctly."
+    }
+  },
+  {
+    "id": "bank-safe-account-transfer",
+    "category": "bank",
+    "title": "Bank safe-account transfer",
+    "expectedRiskLevel": "high_risk",
+    "expectedSignals": ["fake_bank_alert", "payment_destination_change"],
+    "input": {
+      "sourceType": "",
+      "requestedAction": "",
+      "content": "A bank fraud agent called and told me to move my money to a safe account to stop hackers after an unauthorized charge."
+    }
+  },
+  {
+    "id": "sheriff-warrant-gift-card",
+    "category": "government",
+    "title": "Sheriff warrant gift card demand",
+    "expectedRiskLevel": "high_risk",
+    "expectedSignals": ["impersonation", "unusual_payment"],
+    "input": {
+      "sourceType": "",
+      "requestedAction": "",
+      "content": "Someone claiming to be from the sheriff says there is a warrant and I must buy prepaid gift cards today to avoid arrest."
+    }
+  },
+  {
+    "id": "charity-gala-unexpected",
+    "category": "charity",
+    "title": "Unexpected charity gala donation ask",
+    "expectedRiskLevel": "caution",
+    "expectedSignals": ["unexpected_donation"],
+    "input": {
+      "sourceType": "",
+      "requestedAction": "",
+      "content": "A charity I have heard of sent a message about a gala donation, but I did not sign up for texts and there is no official website listed."
+    }
+  },
+  {
+    "id": "utility-prepaid-shutoff",
+    "category": "utility",
+    "title": "Utility shutoff prepaid card demand",
+    "expectedRiskLevel": "high_risk",
+    "expectedSignals": ["urgency", "unusual_payment"],
+    "input": {
+      "sourceType": "",
+      "requestedAction": "",
+      "content": "The electric company says my service will be cancelled in two hours unless I pay with a prepaid card over the phone."
+    }
+  },
+  {
+    "id": "subscription-official-app",
+    "category": "low_risk",
+    "title": "Subscription check through official app",
+    "expectedRiskLevel": "likely_safe",
+    "expectedSignals": [],
+    "input": {
+      "sourceType": "",
+      "requestedAction": "",
+      "content": "I opened the official Netflix app myself to review my subscription. No one sent me a link or asked for codes."
+    }
+  },
+  {
+    "id": "romance-investment-platform",
+    "category": "romance",
+    "title": "Romance investment platform",
+    "expectedRiskLevel": "high_risk",
+    "expectedSignals": ["relationship_pressure", "too_good_to_be_true"],
+    "input": {
+      "sourceType": "",
+      "requestedAction": "",
+      "content": "Someone I met online says they love me and wants me to use their secret trading platform with guaranteed daily returns. They cannot video call."
+    }
+  },
+  {
+    "id": "amazon-prize-google-play-card",
+    "category": "gift_card",
+    "title": "Prize claim requires Google Play card",
+    "expectedRiskLevel": "high_risk",
+    "expectedSignals": ["unusual_payment", "too_good_to_be_true"],
+    "input": {
+      "sourceType": "",
+      "requestedAction": "",
+      "content": "Amazon support says I won a prize, but I need to buy a Google Play gift card today and send the card code to claim it."
+    }
+  },
+  {
+    "id": "paypal-friends-family-fee",
+    "category": "payment_app",
+    "title": "PayPal friends and family protection fee",
+    "expectedRiskLevel": "high_risk",
+    "expectedSignals": ["unusual_payment", "marketplace_overpayment"],
+    "input": {
+      "sourceType": "",
+      "requestedAction": "",
+      "content": "The buyer says PayPal needs me to send a friends and family fee first to upgrade my marketplace account before they can pick up the item."
+    }
+  },
+  {
+    "id": "microsoft-anydesk-bank-refund",
+    "category": "tech_support",
+    "title": "Fake Microsoft support remote refund",
+    "expectedRiskLevel": "high_risk",
+    "expectedSignals": ["remote_access", "impersonation"],
+    "input": {
+      "sourceType": "",
+      "requestedAction": "",
+      "content": "Microsoft support called and says hackers are on my laptop. They told me to install AnyDesk, allow remote access, and open my bank for a refund."
+    }
+  },
+  {
+    "id": "irs-arrest-wire",
+    "category": "government",
+    "title": "IRS arrest wire demand",
+    "expectedRiskLevel": "high_risk",
+    "expectedSignals": ["impersonation", "urgency"],
+    "input": {
+      "sourceType": "",
+      "requestedAction": "",
+      "content": "The IRS called saying I will be arrested today unless I wire the money through Western Union before the office closes."
+    }
+  },
+  {
+    "id": "fedex-address-confirmation-short-link",
+    "category": "delivery",
+    "title": "FedEx address confirmation short link",
+    "expectedRiskLevel": "high_risk",
+    "expectedSignals": ["package_fee", "suspicious_link"],
+    "input": {
+      "sourceType": "",
+      "requestedAction": "",
+      "content": "FedEx delivery notice says my shipment needs address confirmation through a tinyurl link or it will be returned today."
+    }
+  },
+  {
+    "id": "grandchild-bail-gift-card",
+    "category": "family_emergency",
+    "title": "Grandchild bail gift card request",
+    "expectedRiskLevel": "high_risk",
+    "expectedSignals": ["relationship_pressure", "unusual_payment"],
+    "input": {
+      "sourceType": "",
+      "requestedAction": "",
+      "content": "Someone says they are my grandson and were arrested after an emergency. They need bail paid with Apple gift cards and say not to tell anyone."
+    }
+  },
+  {
+    "id": "job-payroll-identity-form",
+    "category": "job",
+    "title": "New job asks for identity details by email",
+    "expectedRiskLevel": "high_risk",
+    "expectedSignals": ["fake_job_check", "code_request"],
+    "input": {
+      "sourceType": "",
+      "requestedAction": "",
+      "content": "A new remote job emailed a payroll setup form asking for my Social Security number, date of birth, bank password, and bank routing number before any interview."
+    }
+  },
+  {
+    "id": "cash-app-verification-code",
+    "category": "account_access",
+    "title": "Cash App verification code request",
+    "expectedRiskLevel": "high_risk",
+    "expectedSignals": ["code_request", "unusual_payment"],
+    "input": {
+      "sourceType": "",
+      "requestedAction": "",
+      "content": "Someone says they need to verify my Cash App account and wants me to send the one-time verification code from my phone."
+    }
+  },
+  {
+    "id": "flyer-qr-unknown-wallet",
+    "category": "qr",
+    "title": "Flyer QR sends donation to unknown wallet",
+    "expectedRiskLevel": "high_risk",
+    "expectedSignals": ["qr_payment", "unexpected_donation"],
+    "input": {
+      "sourceType": "",
+      "requestedAction": "",
+      "content": "A flyer says to scan this QR code to donate to a relief fund, but it opens a payment wallet I do not recognize."
+    }
+  },
+  {
+    "id": "ticket-seller-outside-platform",
+    "category": "marketplace",
+    "title": "Ticket seller wants payment outside platform",
+    "expectedRiskLevel": "high_risk",
+    "expectedSignals": ["unusual_payment", "marketplace_overpayment"],
+    "input": {
+      "sourceType": "",
+      "requestedAction": "",
+      "content": "A ticket seller on Marketplace says to pay by Venmo friends and family outside the platform because buyer protection is broken."
+    }
+  },
+  {
+    "id": "cloud-storage-shared-doc-login",
+    "category": "attachment",
+    "title": "Shared document asks for login",
+    "expectedRiskLevel": "high_risk",
+    "expectedSignals": ["suspicious_link", "attachment_pressure", "identity_verification"],
+    "input": {
+      "sourceType": "",
+      "requestedAction": "",
+      "content": "I got an unexpected shared document link saying I need to validate my login before I can see the file."
+    }
+  },
+  {
+    "id": "insurance-refund-card-link",
+    "category": "identity",
+    "title": "Insurance refund card details link",
+    "expectedRiskLevel": "high_risk",
+    "expectedSignals": ["identity_verification", "suspicious_link"],
+    "input": {
+      "sourceType": "",
+      "requestedAction": "",
+      "content": "My insurance refund message says I must confirm my card details at https://refund-verify.example today to receive the money."
+    }
+  },
+  {
+    "id": "romance-bail-wire",
+    "category": "romance",
+    "title": "Romance bail wire emergency",
+    "expectedRiskLevel": "high_risk",
+    "expectedSignals": ["relationship_pressure", "unusual_payment"],
+    "input": {
+      "sourceType": "",
+      "requestedAction": "",
+      "content": "A person I met online says they love me and need an emergency wire transfer for bail. They cannot video call and want this kept between us."
+    }
+  },
+  {
+    "id": "crypto-withdrawal-tax-fee",
+    "category": "crypto",
+    "title": "Crypto platform withdrawal tax fee",
+    "expectedRiskLevel": "high_risk",
+    "expectedSignals": ["unusual_payment", "too_good_to_be_true"],
+    "input": {
+      "sourceType": "",
+      "requestedAction": "",
+      "content": "A trading platform shows huge returns but says I must send more crypto for a tax fee before I can withdraw my profit."
+    }
+  },
+  {
+    "id": "docu-invoice-pdf-no-macros",
+    "category": "low_risk",
+    "title": "Expected invoice from known vendor",
+    "expectedRiskLevel": "likely_safe",
+    "expectedSignals": [],
+    "input": {
+      "sourceType": "",
+      "requestedAction": "",
+      "content": "My regular vendor sent the monthly invoice from their usual email. I was expecting it and it does not ask me to enable macros, click a new link, or change payment details."
+    }
+  },
+  {
+    "id": "unknown-sender-zip-resume",
+    "category": "attachment",
+    "title": "Unknown sender ZIP resume",
+    "expectedRiskLevel": "high_risk",
+    "expectedSignals": ["attachment_pressure"],
+    "input": {
+      "sourceType": "",
+      "requestedAction": "",
+      "content": "An unknown sender says they attached a zip file with their resume and asks me to open the file today."
+    }
+  },
+  {
+    "id": "bank-official-app-self-check",
+    "category": "low_risk",
+    "title": "User checks bank through official app",
+    "expectedRiskLevel": "caution",
+    "expectedSignals": ["impersonation"],
+    "input": {
+      "sourceType": "",
+      "requestedAction": "",
+      "content": "I opened my bank's official app myself to check a transaction. No message asked me for codes, payments, links, or passwords."
+    }
+  },
+  {
+    "id": "subscription-billing-update-link",
+    "category": "account_access",
+    "title": "Subscription billing update link",
+    "expectedRiskLevel": "high_risk",
+    "expectedSignals": ["identity_verification", "suspicious_link"],
+    "input": {
+      "sourceType": "",
+      "requestedAction": "",
+      "content": "Netflix billing notice says my payment failed and I need to update billing through this link today or the account will be suspended."
+    }
+  },
+  {
+    "id": "zelle-roommate-expected-rent",
+    "category": "low_risk",
+    "title": "Expected roommate Zelle rent payment",
+    "expectedRiskLevel": "high_risk",
+    "expectedSignals": ["unusual_payment"],
+    "input": {
+      "sourceType": "",
+      "requestedAction": "",
+      "content": "My roommate, who I know in person, reminded me that rent is due and asked me to send the normal Zelle payment we use every month."
+    }
+  },
+  {
+    "id": "boss-gift-card-client",
+    "category": "gift_card",
+    "title": "Boss gift card client request",
+    "expectedRiskLevel": "high_risk",
+    "expectedSignals": ["unusual_payment", "secrecy"],
+    "input": {
+      "sourceType": "",
+      "requestedAction": "",
+      "content": "This is your manager. Buy Apple gift cards urgently for a client, keep this confidential, and send me the codes."
+    }
+  },
+  {
+    "id": "paypal-security-code-text",
+    "category": "account_access",
+    "title": "PayPal security code text",
+    "expectedRiskLevel": "high_risk",
+    "expectedSignals": ["code_request", "impersonation"],
+    "input": {
+      "sourceType": "",
+      "requestedAction": "",
+      "content": "PayPal security text says there is suspicious activity and asks me to reply with the security code to secure my account."
+    }
+  },
+  {
+    "id": "toll-road-qr-fee",
+    "category": "qr",
+    "title": "Toll road QR late fee",
+    "expectedRiskLevel": "high_risk",
+    "expectedSignals": ["qr_payment", "urgency"],
+    "input": {
+      "sourceType": "",
+      "requestedAction": "",
+      "content": "A toll notice says final notice: scan the QR code to pay a small fee within 2 hours or a large penalty will be added."
+    }
+  },
+  {
+    "id": "marketplace-zelle-deposit-before-viewing",
+    "category": "marketplace",
+    "title": "Marketplace deposit before viewing",
+    "expectedRiskLevel": "high_risk",
+    "expectedSignals": ["marketplace_overpayment", "unusual_payment"],
+    "input": {
+      "sourceType": "",
+      "requestedAction": "",
+      "content": "A Marketplace seller says I need to pay a Zelle deposit before I can see the apartment, and they will send keys after payment."
+    }
+  },
+  {
+    "id": "facebook-login-help-code",
+    "category": "account_access",
+    "title": "Facebook login help code",
+    "expectedRiskLevel": "high_risk",
+    "expectedSignals": ["code_request"],
+    "input": {
+      "sourceType": "",
+      "requestedAction": "",
+      "content": "Someone says they need help getting back into Facebook and asks me to send them the login code that came to my phone."
+    }
+  },
+  {
+    "id": "vague-urgent-help",
+    "category": "unclear",
+    "title": "Vague urgent help request",
+    "expectedRiskLevel": "caution",
+    "expectedSignals": ["urgency"],
+    "input": {
+      "sourceType": "",
+      "requestedAction": "",
+      "content": "A message just says urgent, I need your help today, please call me right now."
+    }
+  },
+  {
+    "id": "too-short-not-sure",
+    "category": "unclear",
+    "title": "Too short to judge",
+    "expectedRiskLevel": "not_enough_information",
+    "expectedSignals": [],
+    "input": {
+      "sourceType": "",
+      "requestedAction": "",
+      "content": "Is this okay?"
+    }
+  },
+  {
+    "id": "normal-calendar-invite",
+    "category": "low_risk",
+    "title": "Normal calendar invite",
+    "expectedRiskLevel": "likely_safe",
+    "expectedSignals": [],
+    "input": {
+      "sourceType": "",
+      "requestedAction": "",
+      "content": "My coworker sent a normal calendar invite for our team meeting next Wednesday. It does not ask for payment, passwords, codes, or a new login."
+    }
+  }
+]

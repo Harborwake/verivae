@@ -4,6 +4,7 @@
   "private": true,
   "description": "Mobile-first MVP shell for Verivae, a Harborwake money and scam protection app.",
   "scripts": {
+    "scenarios": "node tests/runScenarioLab.js",
     "test": "node --test"
   },
   "devDependencies": {}

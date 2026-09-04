@@ -1,9 +1,12 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 
 global.window = {};
 
 const detection = require("../src/scamDetection.js");
+const scenarioLab = JSON.parse(fs.readFileSync(path.join(__dirname, "scenarioLab.json"), "utf8"));
 
 test("flags urgent gift-card code request as high risk", () => {
   const result = detection.assessScamRisk({
@@ -198,6 +201,25 @@ test("handles custom red-team cases across high, caution, safe, and unclear outc
       assert.equal(result.detectedSignals.length, 0, example.name);
     }
     assert.doesNotMatch(result.explanation, /definitely safe/i, example.name);
+  }
+});
+
+test("scenario lab fixture matches expected risks and required signals", () => {
+  for (const scenario of scenarioLab) {
+    assert.ok(scenario.category, `${scenario.id} missing category`);
+    const result = detection.assessScamRisk({
+      sourceType: "",
+      requestedAction: "",
+      notes: "",
+      ...scenario.input
+    });
+    const actualSignals = result.detectedSignals.map((signal) => signal.id);
+
+    assert.equal(result.riskLevel, scenario.expectedRiskLevel, scenario.id);
+    for (const expectedSignal of scenario.expectedSignals || []) {
+      assert.ok(actualSignals.includes(expectedSignal), `${scenario.id} missing ${expectedSignal}`);
+    }
+    assert.doesNotMatch(result.explanation, /definitely safe/i, scenario.id);
   }
 });
 

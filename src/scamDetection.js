@@ -19,7 +19,7 @@
       label: "Urgency or fear pressure",
       weight: 2,
       pattern:
-        /\b(urgent(?:ly)?|immediately|right now|final notice|act now|today only|last chance|within \d+\s?(minutes?|hours?)|account will be (closed|locked)|account (closed|locked|suspended)|arrest|lawsuit|warrant|delivery fails|will be cancelled)\b/i,
+        /\b(urgent(?:ly)?|immediately|right now|final notice|act now|today only|last chance|within \d+\s?(minutes?|hours?)|account will be (closed|locked)|account (closed|locked|suspended)|arrest(?:ed)?|lawsuit|warrant|delivery fails|will be cancelled)\b/i,
       explanation: "Scams often rush people so they do not pause or verify."
     },
     {
@@ -146,7 +146,7 @@
       label: "Account verification or identity check request",
       weight: 3,
       pattern:
-        /\b(verify (your|my|the) account|account will be suspended|account is locked|apple id is locked|confirm your identity|identity verification|security check|validate your login|confirm your card|update billing|reactivate your account)\b/i,
+        /\b(verify (your|my|the) account|account will be suspended|account is locked|apple id is locked|confirm (your|my|the) identity|identity verification|security check|validate (your|my|the) login|confirm (your|my|the) card|card details|update billing|reactivate (your|my|the) account)\b/i,
       explanation: "Account-verification messages can lead to fake login, payment, or identity forms."
     },
     {
@@ -359,6 +359,10 @@
       return provided;
     }
 
+    const statesNoAction =
+      /\b(no one|nobody|it does not|doesn't|does not|not|no)\b.{0,45}\b(ask(?:ed|s)?|request(?:ed|s)?|need(?:ed|s)?|want(?:ed|s)?|sent|include(?:d|s)?)\b.{0,70}\b(pay(?:ment)?|money|codes?|passwords?|link|login|enable macros|enable content|open a file|change payment details)\b/i.test(content) ||
+      /\b(no links?|no payment|no money|no codes?|no passwords?|no account information|no card information)\b/i.test(content);
+
     if (/\b(gift cards?|apple card|google play|steam card|prepaid card|send (me )?the card (numbers?|codes?))\b/i.test(content)) {
       return "buy_gift_cards";
     }
@@ -371,11 +375,14 @@
       return "install_app";
     }
 
-    if (/\b(attachment|open the file|download the file|invoice attached|enable content|enable macros|zip file|apk file)\b/i.test(content)) {
+    if (
+      /\b(attachment|open the file|download the file|invoice attached|enable content|enable macros|zip file|apk file)\b/i.test(content) &&
+      !statesNoAction
+    ) {
       return "open_attachment";
     }
 
-    if (/\b(click|tap|open this link|verify at|log in at|scan this qr|scan the qr|update billing|reactivate)\b/i.test(content)) {
+    if (/\b(click|tap|open this link|verify at|log in at|scan this qr|scan the qr|update billing|reactivate)\b/i.test(content) && !statesNoAction) {
       return "click_link";
     }
 
@@ -391,7 +398,10 @@
     }
 
     if (/\b(pay|send money|send crypto|want(s)? (me to )?(send|pay|transfer)? ?(crypto|money|payment)|usdt|bitcoin|ethereum|transfer|wire|wired|zelle|venmo|cash app|cashapp|refund|deposit this check|buy equipment|fee|payment|rent|new bank account|safe account|changed payment details|wire instructions)\b/i.test(content)) {
-      if (!/\b(no payment|not asking for money|not asking me to pay|no money|no account information|no card information|menu only)\b/i.test(content)) {
+      if (
+        !statesNoAction &&
+        !/\b(no payment|not asking for money|not asking me to pay|does not ask for payment|no money|no account information|no card information|menu only)\b/i.test(content)
+      ) {
         return "send_money";
       }
     }
@@ -573,8 +583,11 @@
 
   function removeBenignContextSignals(signals, content) {
     const saysNoLink =
-      /\b(no links?|no link is included|no link included|without a link)\b/i.test(content) &&
+      /\b(no links?|no link is included|no link included|without a link|no one sent me a link|does not ask me to .*link|doesn't ask me to .*link|not ask me to .*link)\b/i.test(content) &&
       !/(https?:\/\/|www\.|bit\.ly|tinyurl|t\.co|goo\.gl|ow\.ly|is\.gd|buff\.ly|cutt\.ly|qr code|scan this qr|scan the qr)/i.test(content);
+    const knownExpectedFile =
+      /\b(regular vendor|usual email|expect(?:ed|ing) it|monthly invoice)\b/i.test(content) &&
+      /\b(does not|doesn't|not)\b.{0,80}\b(enable macros|enable content|click a new link|change payment details)\b/i.test(content);
     const menuOnlyQr =
       /\b(qr code|scan this qr|scan the qr)\b/i.test(content) &&
       /\b(menu only|for the menu only|menu)\b/i.test(content) &&
@@ -594,6 +607,10 @@
       }
 
       if (officialOptionalFundraiser && (signal.id === "suspicious_link" || signal.id === "unexpected_donation")) {
+        return false;
+      }
+
+      if (knownExpectedFile && (signal.id === "suspicious_link" || signal.id === "attachment_pressure")) {
         return false;
       }
 
