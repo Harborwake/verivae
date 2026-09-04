@@ -774,7 +774,16 @@ test("local storage saves, updates, reads, and deletes case packets", () => {
   assert.equal(storage.getCasePackets().length, 1);
   assert.equal(storage.getCasePacket(packet.id).status, "Needs more information");
 
-  storage.saveCasePacket({ ...packet, taskProgress: { 0: true, 2: true } });
+  storage.saveCasePacket({
+    ...packet,
+    status: "waiting_bank",
+    statusLabel: "Waiting on bank",
+    caseNotes: "Called the bank through the number on the card.",
+    taskProgress: { 0: true, 2: true }
+  });
+  assert.equal(storage.getCasePacket(packet.id).status, "waiting_bank");
+  assert.equal(storage.getCasePacket(packet.id).statusLabel, "Waiting on bank");
+  assert.equal(storage.getCasePacket(packet.id).caseNotes, "Called the bank through the number on the card.");
   assert.deepEqual(storage.getCasePacket(packet.id).taskProgress, { 0: true, 2: true });
 
   storage.deleteCasePacket(packet.id);

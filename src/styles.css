@@ -758,6 +758,14 @@ li + li {
   border-color: rgba(111, 143, 184, 0.32);
 }
 
+.case-details-form {
+  margin-top: 16px;
+}
+
+.case-details-form textarea {
+  min-height: 128px;
+}
+
 .evidence-meta {
   margin-top: 0;
 }

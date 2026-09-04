@@ -199,6 +199,14 @@
   const sensitiveInfoReminder =
     "Remove passwords, one-time codes, full card numbers, bank login details, private keys, recovery phrases, and private account details.";
 
+  const caseStatusOptions = {
+    reviewing: "Reviewing",
+    waiting_bank: "Waiting on bank",
+    waiting_helper: "Waiting on helper",
+    resolved: "Resolved",
+    not_scam: "Not a scam"
+  };
+
   function routeName() {
     return (window.location.hash || "#home").replace("#", "") || "home";
   }
@@ -303,16 +311,9 @@
 
     return {
       id: `case-${result.id}`,
-      status:
-        result.riskLevel === "not_enough_information"
-          ? "Needs more information"
-          : progressTotal > 0 && progressCompleted === progressTotal
-            ? "Checklist reviewed"
-            : progressCompleted > 0
-              ? "Recovery in progress"
-              : result.shouldUseRecovery
-            ? "Recovery review"
-            : "Reviewing",
+      status: existing?.status || "reviewing",
+      statusLabel: caseStatusOptions[existing?.status] || caseStatusOptions.reviewing,
+      caseNotes: existing?.caseNotes || "",
       createdAt: existing?.createdAt || result.checkedAt || new Date().toISOString(),
       savedAt: existing?.savedAt,
       checkItem,
@@ -364,6 +365,10 @@
     }
 
     return packet.result.shouldUseRecovery ? "Recovery review" : "Reviewing";
+  }
+
+  function caseStatusLabel(packet) {
+    return caseStatusOptions[packet?.status] || packet?.statusLabel || caseStatusOptions.reviewing;
   }
 
   function getLatestCasePacket() {
@@ -1129,7 +1134,8 @@
     const savedPacket = storage.getCasePacket(packet.id);
     const isSaved = Boolean(savedPacket);
     const progress = getCaseProgress(packet);
-    const displayedStatus = deriveCaseStatus(packet);
+    const checklistStatus = deriveCaseStatus(packet);
+    const selectedStatus = caseStatusOptions[packet.status] ? packet.status : "reviewing";
 
     return pageShell(
       "Case packet",
@@ -1155,7 +1161,8 @@
                           <button class="case-picker" type="button" data-open-case="${escapeHtml(saved.id)}">
                             <strong>${escapeHtml(saved.evidenceSummary?.headline || saved.result.riskLabel)}</strong>
                             <span>${escapeHtml(saved.checkItem.content.slice(0, 92))}${saved.checkItem.content.length > 92 ? "..." : ""}</span>
-                            <small>${formatDate(saved.savedAt)} - ${escapeHtml(saved.result.confidence)} confidence - ${escapeHtml(getCaseProgress(saved).label)}</small>
+                            <small>${escapeHtml(caseStatusLabel(saved))} - ${formatDate(saved.savedAt)} - ${escapeHtml(saved.result.confidence)} confidence - ${escapeHtml(getCaseProgress(saved).label)}</small>
+                            ${saved.caseNotes ? `<small>Notes: ${escapeHtml(saved.caseNotes.slice(0, 96))}${saved.caseNotes.length > 96 ? "..." : ""}</small>` : ""}
                           </button>
                           <button class="text-button danger-action" type="button" data-delete-case="${escapeHtml(saved.id)}">Delete</button>
                         </article>
@@ -1173,9 +1180,9 @@
         <section class="case-overview ${levelClass(result.riskLevel)}">
           <div>
             <span class="result-kicker">Current status</span>
-            <h2>${escapeHtml(displayedStatus)}</h2>
+            <h2>${escapeHtml(caseStatusLabel(packet))}</h2>
             <p>${escapeHtml(result.primaryGuidance)}</p>
-            <p class="fine-print">${escapeHtml(progress.label)}. Checking a box only updates this local browser copy.</p>
+            <p class="fine-print">Checklist: ${escapeHtml(progress.label)}. Progress state: ${escapeHtml(checklistStatus)}.</p>
           </div>
           <dl class="evidence-meta">
             <div>
@@ -1200,6 +1207,32 @@
             </div>
           </dl>
         </section>
+
+        <form id="case-details-form" class="form-card case-details-form">
+          <div class="optional-grid">
+            <label>
+              Case status
+              <select name="caseStatus" ${isSaved ? "" : "disabled"}>
+                ${Object.entries(caseStatusOptions)
+                  .map(
+                    ([value, label]) =>
+                      `<option value="${value}" ${selectedStatus === value ? "selected" : ""}>${escapeHtml(label)}</option>`
+                  )
+                  .join("")}
+              </select>
+            </label>
+            <label>
+              Case notes
+              <textarea name="caseNotes" rows="5" ${isSaved ? "" : "disabled"} placeholder="Add safe notes like who you contacted, what you are waiting on, or what you verified.">${escapeHtml(packet.caseNotes || "")}</textarea>
+              <small>${sensitiveInfoReminder}</small>
+            </label>
+          </div>
+          ${
+            isSaved
+              ? `<button class="btn primary" type="submit">Save case details</button>`
+              : `<p class="fine-print">Save this case packet before adding notes or changing status.</p>`
+          }
+        </form>
 
         <section class="plain-panel">
           <h2>What happened</h2>
@@ -1630,10 +1663,38 @@
       ...packet,
       taskProgress
     };
-    nextPacket.status = deriveCaseStatus(nextPacket);
     storage.saveCasePacket(nextPacket);
     state.selectedCasePacketId = packet.id;
     setToast(input.checked ? "Recovery step marked complete." : "Recovery step unchecked.");
+    render();
+  }
+
+  function handleCaseDetailsSubmit(form) {
+    const context = getLatestCasePacket();
+    if (!context) {
+      setToast("Run a check before saving case details.");
+      return;
+    }
+
+    const packet = storage.getCasePacket(context.id);
+    if (!packet) {
+      setToast("Save the case packet before adding case details.");
+      return;
+    }
+
+    const formData = new FormData(form);
+    const requestedStatus = String(formData.get("caseStatus") || "reviewing");
+    const caseNotes = String(formData.get("caseNotes") || "").trim();
+    const status = caseStatusOptions[requestedStatus] ? requestedStatus : "reviewing";
+
+    storage.saveCasePacket({
+      ...packet,
+      status,
+      statusLabel: caseStatusOptions[status],
+      caseNotes
+    });
+    state.selectedCasePacketId = packet.id;
+    setToast("Case details saved locally.");
     render();
   }
 
@@ -1845,6 +1906,14 @@
     const saveCaseButton = document.querySelector("[data-action='save-case']");
     if (saveCaseButton) {
       saveCaseButton.addEventListener("click", saveCurrentCasePacket);
+    }
+
+    const caseDetailsForm = document.querySelector("#case-details-form");
+    if (caseDetailsForm) {
+      caseDetailsForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        handleCaseDetailsSubmit(caseDetailsForm);
+      });
     }
 
     document.querySelectorAll("[data-case-task]").forEach((element) => {
