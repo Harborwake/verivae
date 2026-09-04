@@ -1,5 +1,6 @@
 (function (root) {
   const evidenceKey = "verivae:evidence:v1";
+  const casePacketsKey = "verivae:case-packets:v1";
   const settingsKey = "verivae:settings:v1";
   const memoryStore = {};
 
@@ -55,6 +56,35 @@
     return [];
   }
 
+  function getCasePackets() {
+    return readJson(casePacketsKey, []);
+  }
+
+  function getCasePacket(id) {
+    return getCasePackets().find((item) => item.id === id) || null;
+  }
+
+  function saveCasePacket(packet) {
+    const current = getCasePackets();
+    const savedAt = packet.savedAt || new Date().toISOString();
+    const updatedAt = new Date().toISOString();
+    const nextPacket = { ...packet, savedAt, updatedAt };
+    const next = [nextPacket, ...current.filter((item) => item.id !== nextPacket.id)].slice(0, 25);
+    writeJson(casePacketsKey, next);
+    return next;
+  }
+
+  function deleteCasePacket(id) {
+    const next = getCasePackets().filter((item) => item.id !== id);
+    writeJson(casePacketsKey, next);
+    return next;
+  }
+
+  function clearCasePackets() {
+    writeJson(casePacketsKey, []);
+    return [];
+  }
+
   function getSettings() {
     return { ...defaultSettings, ...readJson(settingsKey, defaultSettings) };
   }
@@ -70,6 +100,11 @@
     saveEvidence,
     deleteEvidence,
     clearEvidence,
+    getCasePackets,
+    getCasePacket,
+    saveCasePacket,
+    deleteCasePacket,
+    clearCasePackets,
     getSettings,
     saveSettings
   };

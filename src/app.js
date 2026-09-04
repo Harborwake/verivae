@@ -18,7 +18,9 @@
     check: renderCheck,
     result: renderResult,
     vault: renderVault,
+    case: renderCasePacket,
     recovery: renderRecovery,
+    report: renderReportPrep,
     helper: renderHelper,
     education: renderEducation,
     settings: renderSettings
@@ -270,7 +272,68 @@
       };
     }
 
-    return storage.getEvidence()[0] || null;
+    const latestEvidence = storage.getEvidence()[0];
+    if (latestEvidence) {
+      return latestEvidence;
+    }
+
+    const latestPacket = storage.getCasePackets()[0];
+    if (latestPacket) {
+      return {
+        checkItem: latestPacket.checkItem,
+        result: latestPacket.result,
+        evidenceSummary: latestPacket.evidenceSummary
+      };
+    }
+
+    return null;
+  }
+
+  function buildCasePacket(context) {
+    const result = context.result;
+    const checkItem = context.checkItem;
+    const evidenceSummary =
+      context.evidenceSummary || detection.summarizeForEvidence(checkItem, result);
+    const recoveryPlan = detection.buildRecoveryPlan(result);
+    const existing = storage.getCasePacket(`case-${result.id}`);
+
+    return {
+      id: `case-${result.id}`,
+      status:
+        result.riskLevel === "not_enough_information"
+          ? "Needs more information"
+          : result.shouldUseRecovery
+            ? "Recovery review"
+            : "Reviewing",
+      createdAt: existing?.createdAt || result.checkedAt || new Date().toISOString(),
+      savedAt: existing?.savedAt,
+      checkItem,
+      result,
+      evidenceSummary,
+      recoveryPlan,
+      helperSummary: detection.buildHelperSummary(checkItem, result),
+      timeline: [
+        {
+          title: "Scam check completed",
+          at: result.checkedAt,
+          detail: `${result.riskLabel} with ${result.confidence.toLowerCase()} confidence.`
+        },
+        {
+          title: "Case packet prepared",
+          at: existing?.updatedAt || new Date().toISOString(),
+          detail: "Local-only packet with judgment, evidence notes, recovery steps, and helper summary."
+        }
+      ]
+    };
+  }
+
+  function getLatestCasePacket() {
+    const context = getLatestContext();
+    if (context) {
+      return buildCasePacket(context);
+    }
+
+    return storage.getCasePackets()[0] || null;
   }
 
   function pageShell(title, eyebrow, body, actions = "") {
@@ -293,6 +356,7 @@
 
   function renderHome() {
     const evidence = storage.getEvidence();
+    const casePackets = storage.getCasePackets();
     const latest = evidence[0];
     return pageShell(
       "Pause before you act",
@@ -316,6 +380,10 @@
           <article>
             <span class="status-number">${evidence.length}</span>
             <span>Evidence items saved locally</span>
+          </article>
+          <article>
+            <span class="status-number">${casePackets.length}</span>
+            <span>Case packets saved locally</span>
           </article>
           <article>
             <span class="status-label">Manual only</span>
@@ -343,6 +411,8 @@
 
         <section class="quick-links" aria-label="Secondary areas">
           ${button("Evidence vault", "vault")}
+          ${button("Case packet", "case")}
+          ${button("Report prep", "report")}
           ${button("Trusted helper", "helper")}
           ${button("Scam education", "education")}
           ${button("Privacy settings", "settings")}
@@ -373,6 +443,16 @@
       .join("");
     const actions = Object.entries(detection.actionLabels)
       .map(([value, label]) => `<option value="${value}">${escapeHtml(label)}</option>`)
+      .join("");
+    const exposureOptions = Object.entries(detection.exposureActionLabels)
+      .map(
+        ([value, label]) => `
+          <label class="choice-row">
+            <input type="checkbox" name="exposureActions" value="${value}">
+            <span>${escapeHtml(label)}</span>
+          </label>
+        `
+      )
       .join("");
 
     return pageShell(
@@ -420,6 +500,14 @@
                 <input name="notes" type="text" placeholder="Example: They said not to tell anyone.">
               </label>
             </div>
+
+            <fieldset class="choice-panel">
+              <legend>Have you already acted?</legend>
+              <p>Optional. Check any that apply, or let Verivae infer from what you wrote.</p>
+              <div class="choice-list">
+                ${exposureOptions}
+              </div>
+            </fieldset>
           </details>
 
           <button class="btn primary" type="submit">Judge scam risk</button>
@@ -473,6 +561,48 @@
     `;
   }
 
+  function renderGuidedReview(result) {
+    const questions = result.followUpQuestions || [];
+    const intro =
+      result.riskLevel === "not_enough_information"
+        ? "Answering a few safer questions can help Verivae judge the situation with less guesswork."
+        : "If anything important is missing, add it here and Verivae will re-check the situation.";
+
+    return `
+      <section class="guided-review">
+        <div>
+          <h2>Add safer details</h2>
+          <p>${escapeHtml(intro)}</p>
+        </div>
+        <div class="follow-up-list">
+          ${questions
+            .map(
+              (question) => `
+                <article class="follow-up-card">
+                  <strong>${escapeHtml(question.prompt)}</strong>
+                  <small>${escapeHtml(question.hint)}</small>
+                </article>
+              `
+            )
+            .join("")}
+        </div>
+        <form id="guided-review-form" class="guided-review-form">
+          <label>
+            Add what you know
+            <textarea
+              name="followUp"
+              rows="5"
+              placeholder="Example: It came by text, they want me to call a number in the message, and I have not clicked or paid."
+              required
+            ></textarea>
+            <small>${privacyReminder}</small>
+          </label>
+          <button class="btn primary" type="submit">Check again with these details</button>
+        </form>
+      </section>
+    `;
+  }
+
   function renderSignalList(signals) {
     if (!signals.length) {
       return `<p class="muted">No strong warning signs found. Keep basic caution and verify unusual requests.</p>`;
@@ -490,6 +620,165 @@
       .join("");
   }
 
+  function renderPaymentPlaybooks(playbooks = []) {
+    if (!playbooks.length) {
+      return "";
+    }
+
+    return `
+      <section class="plain-panel">
+        <h2>Payment-specific recovery notes</h2>
+        <p>These notes depend on the payment route Verivae noticed. They help you prepare for official support, but they do not guarantee a refund or reversal.</p>
+        <div class="playbook-list">
+          ${playbooks
+            .map(
+              (playbook) => `
+                <article class="playbook-card">
+                  <span class="playbook-tag">${escapeHtml(playbook.label)}</span>
+                  <strong>${escapeHtml(playbook.focus)}</strong>
+                  ${renderList(playbook.steps)}
+                </article>
+              `
+            )
+            .join("")}
+        </div>
+      </section>
+    `;
+  }
+
+  function renderRecoveryGroups(groups = []) {
+    return `
+      <section class="recovery-groups">
+        ${groups
+          .filter((group) => group.steps.length)
+          .map(
+            (group, groupIndex) => `
+              <article class="recovery-group">
+                <div>
+                  <h2>${escapeHtml(group.title)}</h2>
+                  <p>${escapeHtml(group.description)}</p>
+                </div>
+                <div class="checklist">
+                  ${group.steps
+                    .map(
+                      (task, taskIndex) => `
+                        <label class="task-row">
+                          <input type="checkbox" data-recovery-task="${groupIndex}-${taskIndex}">
+                          <span>
+                            <strong>${escapeHtml(task.title)}</strong>
+                            <small>${escapeHtml(task.priority)} - ${escapeHtml(task.detail)}</small>
+                          </span>
+                        </label>
+                      `
+                    )
+                    .join("")}
+                </div>
+              </article>
+            `
+          )
+          .join("")}
+      </section>
+    `;
+  }
+
+  function renderReportPrep() {
+    const context = getLatestContext();
+    const prep = context ? detection.buildReportPrep(context.checkItem, context.result) : null;
+
+    if (!prep) {
+      return pageShell(
+        "Report prep",
+        "Local-only draft",
+        `
+          <section class="empty-state">
+            <h2>No report draft yet</h2>
+            <p>Run a scam check first. Verivae can then prepare a local draft and checklist you can review before contacting official support or reporting channels yourself.</p>
+            <p class="fine-print">Verivae does not submit reports, contact providers, or send your evidence in this MVP.</p>
+            ${button("Start a scam check", "check", "primary")}
+          </section>
+        `
+      );
+    }
+
+    return pageShell(
+      "Report prep",
+      "Local-only draft",
+      `
+        <section class="notice">
+          Verivae does not submit reports or contact anyone for you. Use official channels you verify yourself, and ${sensitiveInfoReminder.toLowerCase()}
+        </section>
+
+        <section class="plain-panel">
+          <h2>${escapeHtml(prep.title)}</h2>
+          <p>${escapeHtml(prep.summary)}</p>
+          <dl class="evidence-meta">
+            <div>
+              <dt>Risk</dt>
+              <dd>${escapeHtml(context.result.riskLabel)}</dd>
+            </div>
+            <div>
+              <dt>Confidence</dt>
+              <dd>${escapeHtml(context.result.confidence)}</dd>
+            </div>
+            <div>
+              <dt>Payment</dt>
+              <dd>${escapeHtml(context.result.paymentRouteLabels?.join(", ") || "Unclear")}</dd>
+            </div>
+            <div>
+              <dt>Already acted?</dt>
+              <dd>${escapeHtml(context.result.exposureActionLabels?.join(", ") || "Not sure yet")}</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section class="report-grid">
+          <article class="plain-panel">
+            <h2>Where to start</h2>
+            <div class="report-card-list">
+              ${prep.suggestedChannels
+                .map(
+                  (channel) => `
+                    <article class="report-card">
+                      <strong>${escapeHtml(channel.title)}</strong>
+                      <p>${escapeHtml(channel.detail)}</p>
+                    </article>
+                  `
+                )
+                .join("")}
+            </div>
+          </article>
+
+          <article class="plain-panel">
+            <h2>Evidence to gather</h2>
+            ${renderList(prep.evidenceChecklist)}
+          </article>
+        </section>
+
+        <section class="plain-panel">
+          <h2>Before you submit anywhere</h2>
+          ${renderList(prep.beforeSubmitting)}
+        </section>
+
+        <section class="form-card helper-card">
+          <label>
+            Draft to review and copy
+            <textarea id="report-summary" rows="12">${escapeHtml(prep.draft)}</textarea>
+          </label>
+          <div class="notice">
+            Copying only puts this draft on your clipboard. Verivae does not send it anywhere.
+          </div>
+          <button class="btn primary" type="button" data-action="copy-report">Copy report draft</button>
+        </section>
+      `,
+      `
+        <button class="btn primary" type="button" data-action="copy-report">Copy report draft</button>
+        <button class="btn secondary" type="button" data-route="case">Open case packet</button>
+        <button class="btn secondary" type="button" data-route="recovery">Open recovery steps</button>
+        <button class="btn secondary" type="button" data-route="helper">Prepare helper summary</button>
+      `
+    );
+  }
+
   function renderResultDecisions(result) {
     const saveTitle = result.shouldSaveEvidence ? "Evidence vault: recommended" : "Evidence vault: optional";
     const saveBody = result.shouldSaveEvidence
@@ -499,6 +788,9 @@
     const recoveryBody = result.shouldUseRecovery
       ? "Open recovery steps if you already clicked, paid, shared a code, opened a file, installed an app, or feel unsure what happened."
       : "Use recovery if you already acted or want a calm checklist, but this result does not automatically mean recovery is required.";
+    const caseTitle = "Case packet: useful for review";
+    const caseBody =
+      "Prepare one local view that gathers what happened, the risk judgment, evidence notes, recovery steps, and a trusted-helper summary.";
 
     return `
       <section class="plain-panel">
@@ -511,6 +803,10 @@
           <article class="decision-card">
             <strong>${escapeHtml(recoveryTitle)}</strong>
             <p>${escapeHtml(recoveryBody)}</p>
+          </article>
+          <article class="decision-card">
+            <strong>${escapeHtml(caseTitle)}</strong>
+            <p>${escapeHtml(caseBody)}</p>
           </article>
         </div>
       </section>
@@ -569,6 +865,10 @@
               <dt>Action</dt>
               <dd>${escapeHtml(result.requestedActionLabel)}</dd>
             </div>
+            <div>
+              <dt>Already acted?</dt>
+              <dd>${escapeHtml(result.exposureActionLabels?.join(", ") || "Not sure yet")}</dd>
+            </div>
           </dl>
         </section>
 
@@ -578,6 +878,7 @@
           <h2>Why Verivae gave this result</h2>
           <p>${escapeHtml(result.reasoningSummary)}</p>
           <p class="fine-print">${escapeHtml(result.explanation)}</p>
+          <p class="fine-print">${escapeHtml(result.exposureSummary || "")}</p>
           <p class="fine-print">${escapeHtml(contextInferenceNote(result))}</p>
         </section>
 
@@ -602,12 +903,18 @@
           ${renderList(result.recommendedNextActions)}
         </section>
 
+        ${renderPaymentPlaybooks(result.paymentPlaybooks)}
+
         ${renderResultDecisions(result)}
+
+        ${renderGuidedReview(result)}
 
         ${renderMissingInformation(result)}
       `,
       `
         <button class="btn primary" type="button" data-action="save-evidence">Save local evidence</button>
+        <button class="btn secondary" type="button" data-route="case">Open case packet</button>
+        <button class="btn secondary" type="button" data-route="report">Prepare report draft</button>
         <button class="btn secondary" type="button" data-route="recovery">Open recovery steps</button>
         <button class="btn secondary" type="button" data-route="helper">Prepare helper summary</button>
         <button class="btn secondary" type="button" data-route="check">Run another check</button>
@@ -751,6 +1058,163 @@
     );
   }
 
+  function renderCasePacket() {
+    const packet = getLatestCasePacket();
+
+    if (!packet) {
+      return pageShell(
+        "Case packet",
+        "Local review workspace",
+        `
+          <section class="empty-state">
+            <h2>No case packet yet</h2>
+            <p>Run a scam check first. Verivae can then prepare a local packet with what happened, the risk judgment, recovery steps, and a trusted-helper summary.</p>
+            <p class="fine-print">Case packets stay in this browser for the prototype. They are not sent anywhere automatically.</p>
+            ${button("Start a scam check", "check", "primary")}
+          </section>
+        `
+      );
+    }
+
+    const result = packet.result;
+    const checkItem = packet.checkItem;
+    const savedPacket = storage.getCasePacket(packet.id);
+
+    return pageShell(
+      "Case packet",
+      "Local review workspace",
+      `
+        <section class="notice">
+          This packet is only a local prototype record. Review it before sharing, and ${sensitiveInfoReminder.toLowerCase()}
+        </section>
+
+        <section class="case-overview ${levelClass(result.riskLevel)}">
+          <div>
+            <span class="result-kicker">Current status</span>
+            <h2>${escapeHtml(packet.status)}</h2>
+            <p>${escapeHtml(result.primaryGuidance)}</p>
+          </div>
+          <dl class="evidence-meta">
+            <div>
+              <dt>Risk</dt>
+              <dd>${escapeHtml(result.riskLabel)}</dd>
+            </div>
+            <div>
+              <dt>Confidence</dt>
+              <dd>${escapeHtml(result.confidence)}</dd>
+            </div>
+            <div>
+              <dt>Source</dt>
+              <dd>${escapeHtml(result.sourceLabel)}</dd>
+            </div>
+            <div>
+              <dt>Action</dt>
+              <dd>${escapeHtml(result.requestedActionLabel)}</dd>
+            </div>
+            <div>
+              <dt>Already acted?</dt>
+              <dd>${escapeHtml(result.exposureActionLabels?.join(", ") || "Not sure yet")}</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section class="plain-panel">
+          <h2>What happened</h2>
+          <p class="evidence-situation">${escapeHtml(checkItem.content)}</p>
+          ${checkItem.notes ? `<p class="fine-print"><strong>Notes:</strong> ${escapeHtml(checkItem.notes)}</p>` : ""}
+          <p class="fine-print"><strong>Already acted:</strong> ${escapeHtml(result.exposureActionLabels?.join(", ") || "Not sure yet")}</p>
+          <p class="fine-print">${escapeHtml(contextInferenceNote(result))}</p>
+        </section>
+
+        <section class="two-column">
+          <article class="plain-panel">
+            <h2>Main warning signs</h2>
+            ${renderList(result.judgment.mainWarningSigns)}
+          </article>
+          <article class="plain-panel">
+            <h2>Still unclear</h2>
+            ${renderList(
+              result.missingInformation.length
+                ? result.missingInformation
+                : [
+                    "No specific gaps were flagged, but this packet is still based only on the details entered."
+                  ]
+            )}
+          </article>
+        </section>
+
+        <section class="two-column">
+          <article class="plain-panel">
+            <h2>Do not do this yet</h2>
+            ${renderList(result.doNotDo)}
+          </article>
+          <article class="plain-panel">
+            <h2>Safest next steps</h2>
+            ${renderList(result.safeVerificationSteps)}
+          </article>
+        </section>
+
+        <section class="checklist">
+          ${packet.recoveryPlan.steps
+            .map(
+              (task, index) => `
+                <label class="task-row">
+                  <input type="checkbox" data-case-task="${index}">
+                  <span>
+                    <strong>${escapeHtml(task.title)}</strong>
+                    <small>${escapeHtml(task.priority)} - ${escapeHtml(task.detail)}</small>
+                  </span>
+                </label>
+              `
+            )
+            .join("")}
+        </section>
+
+        ${renderPaymentPlaybooks(packet.recoveryPlan.paymentPlaybooks)}
+
+        <section class="plain-panel">
+          <h2>Trusted-helper summary</h2>
+          <p>Use this as a starting point, then remove secrets before showing it to someone you personally trust.</p>
+          <textarea id="helper-summary" rows="8">${escapeHtml(packet.helperSummary)}</textarea>
+          <button class="btn secondary" type="button" data-action="copy-helper">Copy helper summary</button>
+        </section>
+
+        <section class="plain-panel">
+          <h2>Packet timeline</h2>
+          <div class="timeline-list">
+            ${packet.timeline
+              .map(
+                (item) => `
+                  <article class="timeline-item">
+                    <strong>${escapeHtml(item.title)}</strong>
+                    <small>${formatDate(item.at)}</small>
+                    <p>${escapeHtml(item.detail)}</p>
+                  </article>
+                `
+              )
+              .join("")}
+          </div>
+          ${
+            savedPacket
+              ? `<p class="fine-print">Saved locally ${formatDate(savedPacket.savedAt)}. Last updated ${formatDate(savedPacket.updatedAt)}.</p>`
+              : `<p class="fine-print">This packet has not been saved locally yet.</p>`
+          }
+        </section>
+      `,
+      `
+        <button class="btn primary" type="button" data-action="save-case">Save local case packet</button>
+        ${
+          state.currentCheck && state.currentResult
+            ? `<button class="btn secondary" type="button" data-action="save-evidence">Save evidence</button>`
+            : ""
+        }
+        <button class="btn secondary" type="button" data-route="recovery">Open recovery steps</button>
+        <button class="btn secondary" type="button" data-route="report">Prepare report draft</button>
+        <button class="btn secondary" type="button" data-route="helper">Prepare helper summary</button>
+      `
+    );
+  }
+
   function renderRecovery() {
     const context = getLatestContext();
     const plan = detection.buildRecoveryPlan(context?.result);
@@ -785,28 +1249,20 @@
                     <dt>Action</dt>
                     <dd>${escapeHtml(context.result.requestedActionLabel)}</dd>
                   </div>
+                  <div>
+                    <dt>Already acted?</dt>
+                    <dd>${escapeHtml(context.result.exposureActionLabels?.join(", ") || "Not sure yet")}</dd>
+                  </div>
                 </dl>
                 <p class="fine-print">${escapeHtml(contextInferenceNote(context.result))}</p>
+                <p class="fine-print"><strong>Current situation:</strong> ${escapeHtml(context.result.exposureSummary || "")}</p>
                 <p class="fine-print"><strong>Warning signs:</strong> ${escapeHtml(context.evidenceSummary?.signals || signalSummary(context.result))}</p>
                 <p class="fine-print"><strong>Guidance:</strong> ${escapeHtml(context.result.primaryGuidance)}</p>
               </section>`
             : ""
         }
-        <section class="checklist">
-          ${plan.steps
-            .map(
-              (task, index) => `
-                <label class="task-row">
-                  <input type="checkbox" data-recovery-task="${index}">
-                  <span>
-                    <strong>${escapeHtml(task.title)}</strong>
-                    <small>${escapeHtml(task.priority)} - ${escapeHtml(task.detail)}</small>
-                  </span>
-                </label>
-              `
-            )
-            .join("")}
-        </section>
+        ${renderPaymentPlaybooks(plan.paymentPlaybooks)}
+        ${renderRecoveryGroups(plan.groups)}
         <section class="plain-panel">
           <h2>Helpful records to gather</h2>
           <p>Save only what is useful: screenshots, dates, contact details, transaction IDs, payment app names, links, and a plain summary of what happened. ${sensitiveInfoReminder}</p>
@@ -819,6 +1275,8 @@
               ? `<button class="btn primary" type="button" data-action="save-evidence">Save latest check</button>`
               : ""
           }
+          <button class="btn secondary" type="button" data-route="case">Open case packet</button>
+          <button class="btn secondary" type="button" data-route="report">Prepare report draft</button>
           <button class="btn secondary" type="button" data-route="helper">Prepare helper summary</button>
         `
         : `
@@ -861,8 +1319,13 @@
                     <dt>Action</dt>
                     <dd>${escapeHtml(context.result.requestedActionLabel)}</dd>
                   </div>
+                  <div>
+                    <dt>Already acted?</dt>
+                    <dd>${escapeHtml(context.result.exposureActionLabels?.join(", ") || "Not sure yet")}</dd>
+                  </div>
                 </dl>
                 <p class="fine-print">${escapeHtml(contextInferenceNote(context.result))}</p>
+                <p class="fine-print"><strong>Current situation:</strong> ${escapeHtml(context.result.exposureSummary || "")}</p>
               </section>
 
               <section class="form-card helper-card">
@@ -915,7 +1378,15 @@
                 ${button("Start a scam check", "check", "primary")}
               </section>`
         }
-      `
+      `,
+      summary
+        ? `
+          <button class="btn primary" type="button" data-action="copy-helper">Copy summary</button>
+          <button class="btn secondary" type="button" data-route="report">Prepare report draft</button>
+          <button class="btn secondary" type="button" data-route="case">Open case packet</button>
+          <button class="btn secondary" type="button" data-route="recovery">Open recovery steps</button>
+        `
+        : ""
     );
   }
 
@@ -1033,14 +1504,33 @@
     navigate("vault");
   }
 
+  function saveCurrentCasePacket() {
+    const context = getLatestContext();
+    if (!context) {
+      setToast("Run a check before creating a case packet.");
+      return;
+    }
+
+    const settings = storage.getSettings();
+    if (!settings.saveEvidenceLocally) {
+      setToast("Local saving is turned off in Settings.");
+      return;
+    }
+
+    storage.saveCasePacket(buildCasePacket(context));
+    setToast("Case packet saved locally.");
+    navigate("case");
+  }
+
   function handleCheckSubmit(form) {
     const formData = new FormData(form);
     const checkItem = {
-          sourceType: formData.get("sourceType"),
-          requestedAction: formData.get("requestedAction"),
-          content: formData.get("content"),
-          notes: formData.get("notes")
-        };
+      sourceType: formData.get("sourceType"),
+      requestedAction: formData.get("requestedAction"),
+      exposureActions: formData.getAll("exposureActions"),
+      content: formData.get("content"),
+      notes: formData.get("notes")
+    };
 
     if (String(checkItem.content || "").trim().length < 8) {
       setToast("Add a little more detail before checking.");
@@ -1056,6 +1546,33 @@
     navigate("result");
   }
 
+  function handleGuidedReviewSubmit(form) {
+    if (!state.currentCheck || !state.currentResult) {
+      setToast("Run a check before adding guided details.");
+      return;
+    }
+
+    const formData = new FormData(form);
+    const followUp = String(formData.get("followUp") || "").trim();
+
+    if (followUp.length < 8) {
+      setToast("Add a little more detail before checking again.");
+      return;
+    }
+
+    const nextCheck = {
+      ...state.currentCheck,
+      content: `${state.currentCheck.content}\n\nAdditional review details: ${followUp}`,
+      notes: [state.currentCheck.notes, "Guided review details added"].filter(Boolean).join(" | ")
+    };
+
+    state.currentCheck = nextCheck;
+    state.currentResult = detection.assessScamRisk(nextCheck);
+    state.helperSummary = detection.buildHelperSummary(nextCheck, state.currentResult);
+    setToast("Verivae updated the judgment with your added details.");
+    navigate("result");
+  }
+
   function applySample(index) {
     const sample = sampleScenarios[index];
     if (!sample) {
@@ -1065,6 +1582,9 @@
     const form = document.querySelector("#check-form");
     form.sourceType.value = sample.sourceType;
     form.requestedAction.value = sample.requestedAction;
+    form.querySelectorAll("input[name='exposureActions']").forEach((input) => {
+      input.checked = false;
+    });
     form.content.value = sample.content;
     form.notes.value = `Sample: ${sample.title}`;
     form.content.focus();
@@ -1100,6 +1620,21 @@
     }
   }
 
+  async function copyReportDraft() {
+    const textarea = document.querySelector("#report-summary");
+    if (!textarea) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(textarea.value);
+      setToast("Report draft copied.");
+    } catch (error) {
+      textarea.select();
+      setToast("Report draft selected. Use your browser copy command.");
+    }
+  }
+
   function bindEvents() {
     document.querySelectorAll("[data-route]").forEach((element) => {
       element.addEventListener("click", () => navigate(element.dataset.route));
@@ -1110,6 +1645,14 @@
       checkForm.addEventListener("submit", (event) => {
         event.preventDefault();
         handleCheckSubmit(checkForm);
+      });
+    }
+
+    const guidedReviewForm = document.querySelector("#guided-review-form");
+    if (guidedReviewForm) {
+      guidedReviewForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        handleGuidedReviewSubmit(guidedReviewForm);
       });
     }
 
@@ -1161,10 +1704,18 @@
       saveButton.addEventListener("click", saveCurrentEvidence);
     }
 
-    const copyButton = document.querySelector("[data-action='copy-helper']");
-    if (copyButton) {
-      copyButton.addEventListener("click", copyHelperSummary);
+    const saveCaseButton = document.querySelector("[data-action='save-case']");
+    if (saveCaseButton) {
+      saveCaseButton.addEventListener("click", saveCurrentCasePacket);
     }
+
+    document.querySelectorAll("[data-action='copy-helper']").forEach((element) => {
+      element.addEventListener("click", copyHelperSummary);
+    });
+
+    document.querySelectorAll("[data-action='copy-report']").forEach((element) => {
+      element.addEventListener("click", copyReportDraft);
+    });
 
     const settingsForm = document.querySelector("#settings-form");
     if (settingsForm) {
@@ -1186,6 +1737,8 @@
       const isActive =
         item.dataset.nav === activeRoute ||
         (activeRoute === "result" && item.dataset.nav === "check") ||
+        (activeRoute === "case" && item.dataset.nav === "vault") ||
+        (activeRoute === "report" && item.dataset.nav === "recovery") ||
         (activeRoute === "helper" && item.dataset.nav === "home") ||
         (activeRoute === "education" && item.dataset.nav === "home");
       item.classList.toggle("active", isActive);
