@@ -423,6 +423,7 @@ textarea:focus {
 
 .sample-list,
 .evidence-list,
+.case-list,
 .signal-list,
 .education-grid,
 .checklist,
@@ -816,6 +817,63 @@ details ul {
   gap: 12px;
 }
 
+.compact-empty {
+  margin-bottom: 16px;
+  box-shadow: none;
+}
+
+.case-count {
+  color: var(--sage-dark);
+  font-size: 0.84rem;
+  font-weight: 850;
+}
+
+.case-list {
+  margin-top: 14px;
+}
+
+.case-list-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  background: rgba(255, 253, 248, 0.78);
+}
+
+.case-list-item.selected {
+  border-color: rgba(127, 150, 125, 0.48);
+  background: var(--green-soft);
+}
+
+.case-picker {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  border: 0;
+  padding: 4px;
+  color: var(--ink);
+  background: transparent;
+  text-align: left;
+}
+
+.case-picker span,
+.case-picker small {
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.case-picker span {
+  overflow-wrap: anywhere;
+  font-size: 0.9rem;
+}
+
+.case-picker small {
+  font-size: 0.8rem;
+}
+
 .timeline-list {
   margin-top: 12px;
 }
@@ -864,6 +922,10 @@ details ul {
   line-height: 1.4;
 }
 
+.checklist-note {
+  margin: 0 0 2px;
+}
+
 .task-row input {
   width: 20px;
   height: 20px;
@@ -900,9 +962,6 @@ details ul {
 }
 
 .sticky-actions {
-  position: sticky;
-  bottom: 78px;
-  z-index: 10;
   margin-top: 20px;
   padding: 13px;
   border: 1px solid rgba(226, 216, 199, 0.88);

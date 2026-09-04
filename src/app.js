@@ -10,6 +10,7 @@
     helperSummary: "",
     toast: "",
     vaultFilter: "all",
+    selectedCasePacketId: null,
     pendingSampleIndex: null
   };
 
@@ -296,13 +297,20 @@
       context.evidenceSummary || detection.summarizeForEvidence(checkItem, result);
     const recoveryPlan = detection.buildRecoveryPlan(result);
     const existing = storage.getCasePacket(`case-${result.id}`);
+    const taskProgress = existing?.taskProgress || {};
+    const progressTotal = recoveryPlan.steps.length;
+    const progressCompleted = recoveryPlan.steps.filter((_, index) => taskProgress[String(index)]).length;
 
     return {
       id: `case-${result.id}`,
       status:
         result.riskLevel === "not_enough_information"
           ? "Needs more information"
-          : result.shouldUseRecovery
+          : progressTotal > 0 && progressCompleted === progressTotal
+            ? "Checklist reviewed"
+            : progressCompleted > 0
+              ? "Recovery in progress"
+              : result.shouldUseRecovery
             ? "Recovery review"
             : "Reviewing",
       createdAt: existing?.createdAt || result.checkedAt || new Date().toISOString(),
@@ -311,6 +319,7 @@
       result,
       evidenceSummary,
       recoveryPlan,
+      taskProgress,
       helperSummary: detection.buildHelperSummary(checkItem, result),
       timeline: [
         {
@@ -327,7 +336,45 @@
     };
   }
 
+  function getCaseProgress(packet) {
+    const steps = packet?.recoveryPlan?.steps || [];
+    const progress = packet?.taskProgress || {};
+    const completed = steps.filter((_, index) => progress[String(index)]).length;
+
+    return {
+      completed,
+      total: steps.length,
+      label: steps.length ? `${completed} of ${steps.length} recovery steps checked` : "No recovery steps available"
+    };
+  }
+
+  function deriveCaseStatus(packet) {
+    const progress = getCaseProgress(packet);
+
+    if (packet.result.riskLevel === "not_enough_information") {
+      return "Needs more information";
+    }
+
+    if (progress.total > 0 && progress.completed === progress.total) {
+      return "Checklist reviewed";
+    }
+
+    if (progress.completed > 0) {
+      return "Recovery in progress";
+    }
+
+    return packet.result.shouldUseRecovery ? "Recovery review" : "Reviewing";
+  }
+
   function getLatestCasePacket() {
+    if (state.selectedCasePacketId) {
+      const selectedPacket = storage.getCasePacket(state.selectedCasePacketId);
+      if (selectedPacket) {
+        return selectedPacket;
+      }
+      state.selectedCasePacketId = null;
+    }
+
     const context = getLatestContext();
     if (context) {
       return buildCasePacket(context);
@@ -1059,6 +1106,7 @@
   }
 
   function renderCasePacket() {
+    const savedPackets = storage.getCasePackets();
     const packet = getLatestCasePacket();
 
     if (!packet) {
@@ -1079,6 +1127,9 @@
     const result = packet.result;
     const checkItem = packet.checkItem;
     const savedPacket = storage.getCasePacket(packet.id);
+    const isSaved = Boolean(savedPacket);
+    const progress = getCaseProgress(packet);
+    const displayedStatus = deriveCaseStatus(packet);
 
     return pageShell(
       "Case packet",
@@ -1088,11 +1139,43 @@
           This packet is only a local prototype record. Review it before sharing, and ${sensitiveInfoReminder.toLowerCase()}
         </section>
 
+        ${
+          savedPackets.length
+            ? `<section class="plain-panel">
+                <div class="section-title-row">
+                  <h2>Saved case packets</h2>
+                  <span class="case-count">${savedPackets.length} local</span>
+                </div>
+                <p>Saved packets stay in this browser. Open one to review its evidence, recovery tasks, helper summary, and report draft starting point.</p>
+                <div class="case-list">
+                  ${savedPackets
+                    .map(
+                      (saved) => `
+                        <article class="case-list-item ${saved.id === packet.id ? "selected" : ""}">
+                          <button class="case-picker" type="button" data-open-case="${escapeHtml(saved.id)}">
+                            <strong>${escapeHtml(saved.evidenceSummary?.headline || saved.result.riskLabel)}</strong>
+                            <span>${escapeHtml(saved.checkItem.content.slice(0, 92))}${saved.checkItem.content.length > 92 ? "..." : ""}</span>
+                            <small>${formatDate(saved.savedAt)} - ${escapeHtml(saved.result.confidence)} confidence - ${escapeHtml(getCaseProgress(saved).label)}</small>
+                          </button>
+                          <button class="text-button danger-action" type="button" data-delete-case="${escapeHtml(saved.id)}">Delete</button>
+                        </article>
+                      `
+                    )
+                    .join("")}
+                </div>
+              </section>`
+            : `<section class="empty-state compact-empty">
+                <h2>No saved packets yet</h2>
+                <p>This view is a prepared packet from the latest check. Save it if you want a local case record to revisit later.</p>
+              </section>`
+        }
+
         <section class="case-overview ${levelClass(result.riskLevel)}">
           <div>
             <span class="result-kicker">Current status</span>
-            <h2>${escapeHtml(packet.status)}</h2>
+            <h2>${escapeHtml(displayedStatus)}</h2>
             <p>${escapeHtml(result.primaryGuidance)}</p>
+            <p class="fine-print">${escapeHtml(progress.label)}. Checking a box only updates this local browser copy.</p>
           </div>
           <dl class="evidence-meta">
             <div>
@@ -1155,11 +1238,16 @@
         </section>
 
         <section class="checklist">
+          ${
+            isSaved
+              ? `<p class="fine-print checklist-note">Checklist progress is saved in this local case packet.</p>`
+              : `<p class="fine-print checklist-note">Save this case packet before using checklist tracking.</p>`
+          }
           ${packet.recoveryPlan.steps
             .map(
               (task, index) => `
                 <label class="task-row">
-                  <input type="checkbox" data-case-task="${index}">
+                  <input type="checkbox" data-case-task="${index}" data-case-id="${escapeHtml(packet.id)}" ${packet.taskProgress?.[String(index)] ? "checked" : ""} ${isSaved ? "" : "disabled"}>
                   <span>
                     <strong>${escapeHtml(task.title)}</strong>
                     <small>${escapeHtml(task.priority)} - ${escapeHtml(task.detail)}</small>
@@ -1195,14 +1283,14 @@
               .join("")}
           </div>
           ${
-            savedPacket
+            isSaved
               ? `<p class="fine-print">Saved locally ${formatDate(savedPacket.savedAt)}. Last updated ${formatDate(savedPacket.updatedAt)}.</p>`
               : `<p class="fine-print">This packet has not been saved locally yet.</p>`
           }
         </section>
       `,
       `
-        <button class="btn primary" type="button" data-action="save-case">Save local case packet</button>
+        <button class="btn primary" type="button" data-action="save-case">${isSaved ? "Update local case packet" : "Save local case packet"}</button>
         ${
           state.currentCheck && state.currentResult
             ? `<button class="btn secondary" type="button" data-action="save-evidence">Save evidence</button>`
@@ -1518,8 +1606,35 @@
     }
 
     storage.saveCasePacket(buildCasePacket(context));
+    state.selectedCasePacketId = `case-${context.result.id}`;
     setToast("Case packet saved locally.");
     navigate("case");
+  }
+
+  function handleCaseTaskToggle(input) {
+    const packet = storage.getCasePacket(input.dataset.caseId);
+    if (!packet) {
+      setToast("Save the case packet before tracking checklist progress.");
+      render();
+      return;
+    }
+
+    const taskProgress = { ...(packet.taskProgress || {}) };
+    if (input.checked) {
+      taskProgress[input.dataset.caseTask] = true;
+    } else {
+      delete taskProgress[input.dataset.caseTask];
+    }
+
+    const nextPacket = {
+      ...packet,
+      taskProgress
+    };
+    nextPacket.status = deriveCaseStatus(nextPacket);
+    storage.saveCasePacket(nextPacket);
+    state.selectedCasePacketId = packet.id;
+    setToast(input.checked ? "Recovery step marked complete." : "Recovery step unchecked.");
+    render();
   }
 
   function handleCheckSubmit(form) {
@@ -1677,6 +1792,29 @@
       });
     });
 
+    document.querySelectorAll("[data-open-case]").forEach((element) => {
+      element.addEventListener("click", () => {
+        state.selectedCasePacketId = element.dataset.openCase;
+        render();
+      });
+    });
+
+    document.querySelectorAll("[data-delete-case]").forEach((element) => {
+      element.addEventListener("click", () => {
+        const shouldDelete = window.confirm(
+          "Delete this case packet from this browser? This only removes the local prototype copy."
+        );
+        if (shouldDelete) {
+          storage.deleteCasePacket(element.dataset.deleteCase);
+          if (state.selectedCasePacketId === element.dataset.deleteCase) {
+            state.selectedCasePacketId = null;
+          }
+          render();
+          setToast("Case packet deleted.");
+        }
+      });
+    });
+
     const clearButton = document.querySelector("[data-action='clear-evidence']");
     if (clearButton) {
       clearButton.addEventListener("click", () => {
@@ -1708,6 +1846,10 @@
     if (saveCaseButton) {
       saveCaseButton.addEventListener("click", saveCurrentCasePacket);
     }
+
+    document.querySelectorAll("[data-case-task]").forEach((element) => {
+      element.addEventListener("change", () => handleCaseTaskToggle(element));
+    });
 
     document.querySelectorAll("[data-action='copy-helper']").forEach((element) => {
       element.addEventListener("click", copyHelperSummary);

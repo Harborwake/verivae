@@ -4,14 +4,15 @@ Verivae is an AI-assisted financial safety app from Harborwake for checking scam
 
 ## Start Here
 
-This repository is currently the planning and MVP build home for Verivae. The app has not been coded yet. Before building, read the planning docs in this order:
+This repository is currently the planning and MVP build home for Verivae. A dependency-free local/static MVP shell now lives in `index.html`, `src/`, and `tests/`. Before building, read the planning docs in this order:
 
 1. [Verivae Codex Kickoff Prompt](docs/Codex-Kickoff-Prompt.md)
 2. [Verivae Docs Guide](docs/README.md)
 3. [Verivae Codex Build Handoff - MVP 1](docs/Verivae-Codex-Build-Handoff-MVP-1.md)
 4. [Verivae Product Safety Boundaries](docs/Product-Safety-Boundaries.md)
-5. [Verivae MVP Feature Checklist](docs/MVP-Feature-Checklist.md)
-6. [Verivae Architecture Notes](docs/Architecture-Notes.md)
+5. [Verivae App Design Brief](docs/Verivae-App-Design-Brief.md)
+6. [Verivae MVP Feature Checklist](docs/MVP-Feature-Checklist.md)
+7. [Verivae Architecture Notes](docs/Architecture-Notes.md)
 
 ## MVP Focus
 
@@ -39,6 +40,18 @@ To run the lightweight detection tests:
 
 ```bash
 npm test
+```
+
+To run the scenario regression lab directly:
+
+```bash
+npm run scenarios
+```
+
+If `npm` is unavailable on PATH, the scenario lab can be run with:
+
+```bash
+node tests/runScenarioLab.js
 ```
 
 ## MVP 1 App Structure
