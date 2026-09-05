@@ -471,18 +471,24 @@
         </section>
 
         <section class="list-block">
-          <h2>Practice with examples</h2>
-          <div class="sample-list compact">
-            ${sampleScenarios
-              .slice(0, 4)
-              .map(
-                (sample, index) =>
-                  `<button class="sample-button" type="button" data-start-sample="${index}">
-                    <strong>${escapeHtml(sample.title)}</strong>
-                    <span>Open this example in the manual checker</span>
-                  </button>`
-              )
-              .join("")}
+          <h2>Common situations Verivae can help review</h2>
+          <div class="scenario-list">
+            <article class="scenario-card">
+              <strong>Unexpected money request</strong>
+              <span>Gift cards, crypto, Zelle, Venmo, wire transfers, fees, donations, or changed payment instructions.</span>
+            </article>
+            <article class="scenario-card">
+              <strong>Account or bank alert</strong>
+              <span>Messages asking for login codes, passwords, card details, urgent verification, or a transfer to a safe account.</span>
+            </article>
+            <article class="scenario-card">
+              <strong>Suspicious link, QR code, or file</strong>
+              <span>Delivery fees, fake billing pages, payment QR codes, unexpected attachments, or files that ask you to enable content.</span>
+            </article>
+            <article class="scenario-card">
+              <strong>Someone may be impersonating a person</strong>
+              <span>New-number family emergencies, romance requests, fake support calls, marketplace pressure, or unfamiliar charity contacts.</span>
+            </article>
           </div>
         </section>
       `
