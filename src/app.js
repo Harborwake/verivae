@@ -477,6 +477,24 @@
     return caseStatusOptions[packet?.status] || packet?.statusLabel || caseStatusOptions.reviewing;
   }
 
+  function isCaseClosed(packet) {
+    return ["resolved", "not_scam"].includes(packet?.status);
+  }
+
+  function casesNeedingRecovery(cases) {
+    return cases.filter(
+      (packet) =>
+        !isCaseClosed(packet) &&
+        (packet.result.shouldUseRecovery ||
+          packet.result.riskLevel === "high_risk" ||
+          packet.result.riskLevel === "caution")
+    );
+  }
+
+  function latestOpenCase(cases) {
+    return cases.find((packet) => !isCaseClosed(packet)) || null;
+  }
+
   function renderSavedCaseCard(saved, activeId) {
     const progress = getCaseProgress(saved);
     const updatedAt = saved.updatedAt || saved.savedAt || saved.createdAt;
@@ -555,87 +573,154 @@
   function renderHome() {
     const evidence = storage.getEvidence();
     const casePackets = storage.getCasePackets();
+    const openCases = casePackets.filter((packet) => !isCaseClosed(packet));
+    const recoveryCases = casesNeedingRecovery(casePackets);
+    const infoNeededCases = openCases.filter(
+      (packet) => packet.result.riskLevel === "not_enough_information"
+    );
+    const priorityCase = latestOpenCase(casePackets);
     const latest = evidence[0];
+    const priorityTitle = priorityCase
+      ? priorityCase.caseTitle ||
+        suggestCaseTitle(priorityCase.checkItem, priorityCase.result, priorityCase.evidenceSummary)
+      : "";
+
     return pageShell(
-      "Pause before you act",
+      "Your safety check-in",
       "Money and scam protection",
       `
-        <section class="hero-panel">
-          <h2>Check before sending money, codes, or access</h2>
-          <p>
-            Paste a suspicious message, payment request, link, QR situation, call summary, or attachment concern. Verivae will look for common warning signs and suggest a safer next step.
-          </p>
+        <section class="home-snapshot">
+          <div class="snapshot-copy">
+            <span class="result-kicker">Manual protection MVP</span>
+            <h2>Check the situation before you send money, share codes, click links, or give access.</h2>
+            <p>
+              Verivae reviews what you type, looks for common scam warning signs, and helps you choose safer next steps. It does not connect to Gmail, SMS, banks, payment apps, or your device in this prototype.
+            </p>
+          </div>
           <div class="hero-actions">
-            ${button("Start a scam check", "check", "primary")}
+            ${button("Check something suspicious", "check", "primary")}
             ${button("I already acted", "recovery")}
           </div>
           <p class="boundary-note">
-            Verivae can help assess risk and organize safer next steps. It cannot guarantee scam detection, refunds, recovery, or device cleanup.
+            Verivae can help assess risk and organize next steps. It cannot guarantee scam detection, refunds, account recovery, legal outcomes, or device cleanup.
           </p>
         </section>
 
-        <section class="status-grid" aria-label="Prototype status">
+        <section class="home-metrics" aria-label="Local safety status">
           <article>
-            <span class="status-number">${evidence.length}</span>
-            <span>Evidence items saved locally</span>
+            <span class="metric-value">${openCases.length}</span>
+            <span>Open cases</span>
           </article>
           <article>
-            <span class="status-number">${casePackets.length}</span>
-            <span>Cases saved locally</span>
+            <span class="metric-value">${recoveryCases.length}</span>
+            <span>Need follow-up</span>
           </article>
           <article>
-            <span class="status-label">Manual only</span>
-            <span>No Gmail, SMS, bank, payment, or device access in this MVP</span>
+            <span class="metric-value">${evidence.length}</span>
+            <span>Evidence saved</span>
           </article>
         </section>
 
-        ${
-          latest
-            ? `<section class="list-block">
-                <h2>Latest saved check</h2>
-                <article class="evidence-card">
+        <section class="priority-panel">
+          ${
+            priorityCase
+              ? `<div class="priority-header">
+                  <span class="result-kicker">Continue safely</span>
+                  <span>${formatDate(priorityCase.updatedAt || priorityCase.savedAt || priorityCase.createdAt)}</span>
+                </div>
+                <h2>${escapeHtml(priorityTitle)}</h2>
+                <p>${escapeHtml(caseNextAction(priorityCase))}</p>
+                <dl class="compact-meta">
                   <div>
-                    <strong>${escapeHtml(latest.result.riskLabel)}</strong>
-                    <p>${escapeHtml(latest.checkItem.content.slice(0, 120))}${latest.checkItem.content.length > 120 ? "..." : ""}</p>
+                    <dt>Status</dt>
+                    <dd>${escapeHtml(caseStatusLabel(priorityCase))}</dd>
                   </div>
-                  <span>${formatDate(latest.savedAt)}</span>
-                </article>
-              </section>`
-            : `<section class="empty-state">
-                <h2>No evidence saved yet</h2>
-                <p>Run a check, then save the result only if you need a record and it does not contain sensitive secrets.</p>
-              </section>`
-        }
+                  <div>
+                    <dt>Risk</dt>
+                    <dd>${escapeHtml(priorityCase.result.riskLabel)}</dd>
+                  </div>
+                  <div>
+                    <dt>Progress</dt>
+                    <dd>${escapeHtml(getCaseProgress(priorityCase).label)}</dd>
+                  </div>
+                </dl>
+                <div class="panel-actions">
+                  <button class="btn primary" type="button" data-open-case-route="${escapeHtml(priorityCase.id)}">Continue saved case</button>
+                  ${button("Open recovery steps", "recovery")}
+                </div>`
+              : latest
+                ? `<div class="priority-header">
+                    <span class="result-kicker">Latest saved check</span>
+                    <span>${formatDate(latest.savedAt)}</span>
+                  </div>
+                  <h2>${escapeHtml(latest.result.riskLabel)}</h2>
+                  <p>${escapeHtml(latest.result.primaryGuidance)}</p>
+                  <p class="evidence-situation">${escapeHtml(latest.checkItem.content.slice(0, 180))}${latest.checkItem.content.length > 180 ? "..." : ""}</p>
+                  <div class="panel-actions">
+                    ${button("Review evidence vault", "vault", "primary")}
+                    ${button("Prepare helper summary", "helper")}
+                  </div>`
+                : `<span class="result-kicker">Ready when you are</span>
+                  <h2>No saved cases yet</h2>
+                  <p>Start with one suspicious message, call, payment request, link, QR code, or file concern. You can save evidence afterward if it is useful and does not contain secrets.</p>
+                  ${button("Start first check", "check", "primary")}`
+          }
+        </section>
 
-        <section class="quick-links" aria-label="Secondary areas">
-          ${button("Evidence vault", "vault")}
-          ${button("Cases", "case")}
-          ${button("Report prep", "report")}
-          ${button("Trusted helper", "helper")}
-          ${button("Scam education", "education")}
-          ${button("Privacy settings", "settings")}
+        <section class="home-followups" aria-label="What needs attention">
+          <article class="${recoveryCases.length ? "attention" : ""}">
+            <strong>${recoveryCases.length ? "Recovery steps may need attention" : "No urgent recovery tasks saved"}</strong>
+            <span>${recoveryCases.length ? "Open Recovery to work through the safest next steps from your saved cases." : "If you already sent money, shared a code, or installed remote access, start Recovery right away."}</span>
+            ${button("Open recovery", "recovery")}
+          </article>
+          <article class="${infoNeededCases.length ? "attention" : ""}">
+            <strong>${infoNeededCases.length ? "Some cases need more details" : "Checks stay cautious when details are limited"}</strong>
+            <span>${infoNeededCases.length ? "Add safe details like source, request, timing, and whether you already acted." : "Verivae will avoid calling something definitely safe when it does not know enough."}</span>
+            ${button("Review cases", "case")}
+          </article>
         </section>
 
         <section class="list-block">
-          <h2>Common situations Verivae can help review</h2>
-          <div class="scenario-list">
+          <div class="section-title-row">
+            <h2>Common situations Verivae can review</h2>
+            <button class="text-button" type="button" data-route="education">Learn more</button>
+          </div>
+          <div class="scenario-list compact-scenarios">
             <article class="scenario-card">
-              <strong>Unexpected money request</strong>
-              <span>Gift cards, crypto, Zelle, Venmo, wire transfers, fees, donations, or changed payment instructions.</span>
+              <strong>Unexpected money requests</strong>
+              <span>Gift cards, crypto, wire transfers, payment apps, refund requests, donations, or changed instructions.</span>
             </article>
             <article class="scenario-card">
-              <strong>Account or bank alert</strong>
-              <span>Messages asking for login codes, passwords, card details, urgent verification, or a transfer to a safe account.</span>
+              <strong>Account or bank warnings</strong>
+              <span>Urgent verification, login codes, passwords, card details, or calls to numbers from the message.</span>
             </article>
             <article class="scenario-card">
               <strong>Suspicious link, QR code, or file</strong>
-              <span>Delivery fees, fake billing pages, payment QR codes, unexpected attachments, or files that ask you to enable content.</span>
+              <span>Delivery fees, fake billing pages, payment QR codes, unexpected attachments, or enable-content prompts.</span>
             </article>
             <article class="scenario-card">
-              <strong>Someone may be impersonating a person</strong>
-              <span>New-number family emergencies, romance requests, fake support calls, marketplace pressure, or unfamiliar charity contacts.</span>
+              <strong>Impersonation or pressure</strong>
+              <span>New-number emergencies, romance requests, fake support calls, marketplace pressure, or unfamiliar charity contacts.</span>
             </article>
           </div>
+        </section>
+
+        <section class="home-secondary" aria-label="Other Verivae tools">
+          <article>
+            <strong>Evidence vault</strong>
+            <span>Review local saved evidence and delete anything you no longer need.</span>
+            ${button("Open vault", "vault")}
+          </article>
+          <article>
+            <strong>Trusted helper</strong>
+            <span>Prepare a copyable summary that leaves out sensitive secrets.</span>
+            ${button("Prepare summary", "helper")}
+          </article>
+          <article>
+            <strong>Privacy settings</strong>
+            <span>See what this prototype saves locally and what it does not access.</span>
+            ${button("Open settings", "settings")}
+          </article>
         </section>
       `
     );
@@ -996,34 +1081,67 @@
   }
 
   function renderResultDecisions(result) {
-    const saveTitle = result.shouldSaveEvidence ? "Evidence vault: recommended" : "Evidence vault: optional";
-    const saveBody = result.shouldSaveEvidence
-      ? "Save a local record if it does not include passwords, codes, full card numbers, bank login details, private keys, or recovery phrases."
-      : "Saving is optional. Use it only if you want a local record of the check.";
-    const recoveryTitle = result.shouldUseRecovery ? "Recovery workspace: recommended" : "Recovery workspace: not usually needed yet";
-    const recoveryBody = result.shouldUseRecovery
-      ? "Open recovery steps if you already clicked, paid, shared a code, opened a file, installed an app, or feel unsure what happened."
-      : "Use recovery if you already acted or want a calm checklist, but this result does not automatically mean recovery is required.";
-    const caseTitle = "Cases: useful for review";
-    const caseBody =
-      "Prepare one local case view that gathers what happened, the risk judgment, evidence notes, recovery steps, and a trusted-helper summary.";
+    const decisions = [
+      {
+        title: result.shouldUseRecovery ? "Open recovery steps" : "Recovery is optional",
+        body: result.shouldUseRecovery
+          ? "Use a calm checklist if you clicked, paid, shared a code, opened a file, installed an app, or feel unsure what happened."
+          : "This result does not automatically mean recovery is required, but the checklist is available if you already acted.",
+        action: "Open recovery",
+        route: "recovery",
+        priority: result.shouldUseRecovery
+      },
+      {
+        title: "Save a local case",
+        body:
+          "Create one local workspace with what happened, the risk judgment, recovery tasks, evidence notes, and helper summary.",
+        action: "Save case",
+        dataAction: "save-case",
+        priority: !result.shouldUseRecovery
+      },
+      {
+        title: result.shouldSaveEvidence ? "Save evidence" : "Evidence is optional",
+        body: result.shouldSaveEvidence
+          ? "Save a local record only after removing passwords, codes, full card numbers, bank login details, private keys, and recovery phrases."
+          : "Saving is optional. Use it only if you want a local record of the check.",
+        action: "Save evidence",
+        dataAction: "save-evidence",
+        priority: false
+      },
+      {
+        title: "Ask a trusted helper",
+        body:
+          "Prepare a copyable summary you can review first. Verivae does not send it automatically.",
+        action: "Prepare summary",
+        route: "helper",
+        priority: false
+      }
+    ];
 
     return `
-      <section class="plain-panel">
-        <h2>What Verivae recommends now</h2>
+      <section class="plain-panel action-recommendations">
+        <div class="section-title-row">
+          <h2>What to do next</h2>
+          <button class="text-button" type="button" data-route="check">Run another check</button>
+        </div>
         <div class="decision-grid">
-          <article class="decision-card">
-            <strong>${escapeHtml(saveTitle)}</strong>
-            <p>${escapeHtml(saveBody)}</p>
-          </article>
-          <article class="decision-card">
-            <strong>${escapeHtml(recoveryTitle)}</strong>
-            <p>${escapeHtml(recoveryBody)}</p>
-          </article>
-          <article class="decision-card">
-            <strong>${escapeHtml(caseTitle)}</strong>
-            <p>${escapeHtml(caseBody)}</p>
-          </article>
+          ${decisions
+            .map(
+              (decision) => `
+                <article class="decision-card ${decision.priority ? "priority" : ""}">
+                  <div>
+                    <strong>${escapeHtml(decision.title)}</strong>
+                    <p>${escapeHtml(decision.body)}</p>
+                  </div>
+                  ${
+                    decision.dataAction
+                      ? `<button class="btn ${decision.priority ? "primary" : "secondary"}" type="button" data-action="${decision.dataAction}">${escapeHtml(decision.action)}</button>`
+                      : `<button class="btn ${decision.priority ? "primary" : "secondary"}" type="button" data-route="${decision.route}">${escapeHtml(decision.action)}</button>`
+                  }
+                </article>
+              `
+            )
+            .join("")}
         </div>
       </section>
     `;
@@ -1128,11 +1246,8 @@
         ${renderMissingInformation(result)}
       `,
       `
-        <button class="btn primary" type="button" data-action="save-evidence">Save local evidence</button>
-        <button class="btn secondary" type="button" data-route="case">Open cases</button>
-        <button class="btn secondary" type="button" data-route="report">Prepare report draft</button>
-        <button class="btn secondary" type="button" data-route="recovery">Open recovery steps</button>
-        <button class="btn secondary" type="button" data-route="helper">Prepare helper summary</button>
+        <button class="btn primary" type="button" data-action="save-case">Save local case</button>
+        <button class="btn secondary" type="button" data-route="recovery">Open recovery</button>
         <button class="btn secondary" type="button" data-route="check">Run another check</button>
       `
     );
@@ -1168,6 +1283,8 @@
     const evidence = storage.getEvidence();
     const visibleEvidence = filteredEvidence(evidence);
     const sourceTypes = Array.from(new Set(evidence.map((item) => item.result.sourceType))).filter(Boolean);
+    const highRiskEvidence = getRiskCount(evidence, "high_risk");
+    const unclearEvidence = getRiskCount(evidence, "not_enough_information");
 
     return pageShell(
       "Evidence vault",
@@ -1175,6 +1292,24 @@
       `
         <section class="notice">
           Saved evidence stays in this browser for the prototype. ${sensitiveInfoReminder}
+        </section>
+
+        <section class="vault-summary">
+          <article>
+            <span class="metric-value">${evidence.length}</span>
+            <strong>Saved items</strong>
+            <p>Local records in this browser only.</p>
+          </article>
+          <article>
+            <span class="metric-value">${highRiskEvidence}</span>
+            <strong>High risk</strong>
+            <p>Prioritize records where money, codes, links, files, or access may be involved.</p>
+          </article>
+          <article>
+            <span class="metric-value">${unclearEvidence}</span>
+            <strong>Need details</strong>
+            <p>Add safe context through a new check if the first record was too vague.</p>
+          </article>
         </section>
 
         ${
@@ -1268,6 +1403,7 @@
                 <p>After a scam check, save a safe record here if you may need details for a bank, payment app, trusted helper, or official report.</p>
                 <p class="fine-print">Good evidence includes screenshots, links, contact names, phone numbers, dates, transaction notes, and a short summary. ${sensitiveInfoReminder}</p>
                 ${button("Run a check", "check", "primary")}
+                ${button("Open cases", "case")}
               </section>`
         }
       `
@@ -1528,10 +1664,23 @@
         <section class="notice">
           Verivae can help organize recovery steps, but it cannot guarantee refunds, account recovery, law-enforcement action, or device cleanup.
         </section>
-        <section class="plain-panel">
-          <h2>Start here</h2>
-          <p>${escapeHtml(plan.context)}</p>
-          <p class="fine-print">If money, account access, or private information may already be involved, focus on stopping more harm first. Use official contact paths, not links or phone numbers from the suspicious message.</p>
+        <section class="recovery-hero">
+          <div>
+            <span class="result-kicker">First priority</span>
+            <h2>Stop more harm, then organize what happened.</h2>
+            <p>${escapeHtml(plan.context)}</p>
+            <p class="fine-print">Use official contact paths you choose yourself, not links or phone numbers from the suspicious message.</p>
+          </div>
+          <div class="recovery-status-strip">
+            <article>
+              <strong>${casePacket ? caseStatusLabel(casePacket) : "No saved case selected"}</strong>
+              <span>${casePacket ? "Current case status" : "Run or save a check to track progress here."}</span>
+            </article>
+            <article>
+              <strong>${caseProgress ? `${caseProgress.completed}/${caseProgress.total || 0}` : "0/0"}</strong>
+              <span>${caseProgress ? "Recovery steps checked" : "Checklist progress is not saved yet."}</span>
+            </article>
+          </div>
         </section>
         ${
           context
@@ -1591,6 +1740,10 @@
             : ""
         }
         ${renderPaymentPlaybooks(plan.paymentPlaybooks)}
+        <section class="plain-panel">
+          <h2>Use this workspace calmly</h2>
+          <p>Start with the steps that prevent more loss: stop contact, avoid sending more money or codes, preserve evidence, and contact official providers yourself.</p>
+        </section>
         ${renderRecoveryGroups(plan.groups, casePacket)}
         <section class="plain-panel">
           <h2>Helpful records to gather</h2>
@@ -1627,15 +1780,21 @@
       `
         ${
           summary
-            ? `<section class="plain-panel">
-                <h2>You do not have to handle this alone</h2>
+            ? `<section class="helper-hero">
+                <span class="result-kicker">Safe sharing</span>
+                <h2>You do not have to handle this alone.</h2>
                 <p>Scams are designed to create pressure, confusion, and embarrassment. Asking someone calm to sit with you is a strong safety step.</p>
+                <p class="fine-print">Verivae only prepares the summary. It does not send messages, open contacts, or share anything automatically.</p>
               </section>
 
               <section class="plain-panel">
-                <h2>Latest check</h2>
+                <h2>Summary source</h2>
                 <p>${escapeHtml(context.evidenceSummary?.headline || context.result.riskLabel)}</p>
                 <dl class="evidence-meta">
+                  <div>
+                    <dt>Risk</dt>
+                    <dd>${escapeHtml(context.result.riskLabel)}</dd>
+                  </div>
                   <div>
                     <dt>Confidence</dt>
                     <dd>${escapeHtml(context.result.confidence)}</dd>
@@ -1661,6 +1820,7 @@
                 <label>
                   Summary to show a trusted person
                   <textarea id="helper-summary" rows="11">${escapeHtml(summary)}</textarea>
+                  <small>Review this before copying. Remove anything private that a helper does not need.</small>
                 </label>
                 <div class="notice">
                   Copying only puts this summary on your clipboard. Verivae does not send it anywhere. ${sensitiveInfoReminder}
@@ -1724,9 +1884,26 @@
       "Scam education",
       "Short lessons",
       `
-        <section class="plain-panel">
-          <h2>Learn the warning signs Verivae uses</h2>
-          <p>These short lessons match the same patterns the local scam check looks for. Use them as practice, not as a promise that every scam will be caught.</p>
+        <section class="education-hero">
+          <span class="result-kicker">Safer habits</span>
+          <h2>Learn the patterns behind Verivae results.</h2>
+          <p>These short lessons match the same warning signs the local scam check looks for. They are meant to help you pause and verify, not promise that every scam will be caught.</p>
+          <button class="btn primary" type="button" data-route="check">Check something suspicious</button>
+        </section>
+
+        <section class="education-shortcuts" aria-label="Core safety habits">
+          <article>
+            <strong>Slow down</strong>
+            <span>Urgency is one of the most common ways scammers push people into mistakes.</span>
+          </article>
+          <article>
+            <strong>Choose the channel</strong>
+            <span>Verify through an official app, typed website, known phone number, or person you already trust.</span>
+          </article>
+          <article>
+            <strong>Protect secrets</strong>
+            <span>Do not share passwords, one-time codes, full card numbers, private keys, or recovery phrases.</span>
+          </article>
         </section>
 
         <section class="education-grid">
@@ -1749,7 +1926,7 @@
         </section>
         <section class="plain-panel">
           <h2>Practice habit</h2>
-          <p>When a request involves money, access, secrecy, or urgency, pause and verify through a channel you choose yourself.</p>
+          <p>When a request involves money, access, secrecy, urgency, or embarrassment, pause and verify through a channel you choose yourself.</p>
         </section>
       `
     );
@@ -1761,7 +1938,28 @@
       "Settings and privacy",
       "Clear boundaries",
       `
+        <section class="settings-summary">
+          <article>
+            <span class="result-kicker">Stored here</span>
+            <strong>Local prototype data</strong>
+            <p>Saved evidence, cases, notes, and settings stay in this browser on this device for now.</p>
+          </article>
+          <article>
+            <span class="result-kicker">Not connected</span>
+            <strong>No outside accounts</strong>
+            <p>Verivae does not access Gmail, SMS, banks, payment apps, contacts, cloud sync, or device scanning in this MVP.</p>
+          </article>
+        </section>
+
+        <section class="notice">
+          ${sensitiveInfoReminder} Verivae does not need those secrets to help you think through scam risk.
+        </section>
+
         <form id="settings-form" class="form-card">
+          <div>
+            <h2>Prototype preferences</h2>
+            <p class="fine-print">These settings only affect this local browser prototype.</p>
+          </div>
           <label class="toggle-row">
             <span>
               <strong>Save evidence locally</strong>
@@ -1792,10 +1990,6 @@
         <section class="plain-panel">
           <h2>What local storage means</h2>
           <p>Saved evidence stays in this browser for the prototype. Clearing browser data, switching devices, or using another browser may remove or hide it.</p>
-        </section>
-
-        <section class="notice">
-          ${sensitiveInfoReminder} Verivae does not need those secrets to help you think through scam risk.
         </section>
 
         <section class="plain-panel">
@@ -2069,6 +2263,13 @@
       element.addEventListener("click", () => {
         state.selectedCasePacketId = element.dataset.openCase;
         render();
+      });
+    });
+
+    document.querySelectorAll("[data-open-case-route]").forEach((element) => {
+      element.addEventListener("click", () => {
+        state.selectedCasePacketId = element.dataset.openCaseRoute;
+        navigate("case");
       });
     });
 
