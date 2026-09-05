@@ -1043,6 +1043,73 @@ li + li {
   min-height: 128px;
 }
 
+.case-workspace {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.case-section-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  border: 1px solid rgba(226, 216, 199, 0.86);
+  border-radius: 8px;
+  padding: 8px;
+  background: rgba(255, 253, 248, 0.72);
+}
+
+.case-section-tab {
+  min-height: 42px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 9px 10px;
+  color: var(--muted);
+  background: transparent;
+  font-size: 0.86rem;
+  font-weight: 850;
+}
+
+.case-section-tab.active {
+  border-color: rgba(127, 150, 125, 0.42);
+  color: var(--navy);
+  background: rgba(237, 246, 237, 0.86);
+  box-shadow: 0 1px 0 rgba(24, 42, 68, 0.04);
+}
+
+.case-section-panel {
+  display: grid;
+  gap: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+  background: rgba(255, 253, 248, 0.92);
+  box-shadow: var(--soft-shadow);
+}
+
+.case-section-panel > h2,
+.case-section-panel .section-title-row h2 {
+  margin-bottom: 0;
+}
+
+.case-section-panel > p {
+  margin-bottom: 0;
+}
+
+.nested-panel {
+  padding: 15px;
+  box-shadow: none;
+}
+
+.case-insight-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.case-section-panel textarea {
+  min-height: 236px;
+}
+
 .evidence-meta {
   margin-top: 0;
 }
@@ -1441,6 +1508,14 @@ details ul {
 
   .home-secondary article {
     align-content: start;
+  }
+
+  .case-section-tabs {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .case-insight-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .status-grid {

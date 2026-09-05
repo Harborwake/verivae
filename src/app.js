@@ -11,6 +11,7 @@
     toast: "",
     vaultFilter: "all",
     caseFilter: "all",
+    caseSection: "overview",
     selectedCasePacketId: null,
     pendingSampleIndex: null
   };
@@ -1410,6 +1411,169 @@
     );
   }
 
+  function renderCaseSectionNav(progress) {
+    const sections = [
+      { id: "overview", label: "Overview" },
+      { id: "checklist", label: `Checklist ${progress.total ? `${progress.completed}/${progress.total}` : ""}` },
+      { id: "helper", label: "Helper" },
+      { id: "timeline", label: "Timeline" }
+    ];
+
+    return `
+      <div class="case-section-tabs" aria-label="Case sections">
+        ${sections
+          .map(
+            (section) => `
+              <button class="case-section-tab ${state.caseSection === section.id ? "active" : ""}" type="button" data-case-section="${section.id}" aria-pressed="${state.caseSection === section.id ? "true" : "false"}">
+                ${escapeHtml(section.label)}
+              </button>
+            `
+          )
+          .join("")}
+      </div>
+    `;
+  }
+
+  function renderCaseOverviewSection(packet, checklistStatus) {
+    const result = packet.result;
+    const checkItem = packet.checkItem;
+
+    return `
+      <section class="case-section-panel">
+        <div class="section-title-row">
+          <h2>Case overview</h2>
+          <button class="text-button" type="button" data-route="recovery">Open recovery</button>
+        </div>
+        <section class="plain-panel nested-panel">
+          <h2>What happened</h2>
+          <p class="evidence-situation">${escapeHtml(checkItem.content)}</p>
+          ${checkItem.notes ? `<p class="fine-print"><strong>Notes:</strong> ${escapeHtml(checkItem.notes)}</p>` : ""}
+          <p class="fine-print"><strong>Already acted:</strong> ${escapeHtml(result.exposureActionLabels?.join(", ") || "Not sure yet")}</p>
+          <p class="fine-print">${escapeHtml(contextInferenceNote(result))}</p>
+        </section>
+        <section class="case-insight-grid">
+          <article class="plain-panel nested-panel">
+            <h2>Main warning signs</h2>
+            ${renderList(result.judgment.mainWarningSigns)}
+          </article>
+          <article class="plain-panel nested-panel">
+            <h2>Still unclear</h2>
+            ${renderList(
+              result.missingInformation.length
+                ? result.missingInformation
+                : ["No specific gaps were flagged, but this case is still based only on the details entered."]
+            )}
+          </article>
+          <article class="plain-panel nested-panel">
+            <h2>Do not do this yet</h2>
+            ${renderList(result.doNotDo)}
+          </article>
+          <article class="plain-panel nested-panel">
+            <h2>Safest next steps</h2>
+            ${renderList(result.safeVerificationSteps)}
+          </article>
+        </section>
+        <p class="fine-print">Progress state: ${escapeHtml(checklistStatus)}. Verivae is using only the details saved in this local case.</p>
+      </section>
+    `;
+  }
+
+  function renderCaseChecklistSection(packet, isSaved) {
+    return `
+      <section class="case-section-panel">
+        <div class="section-title-row">
+          <h2>Recovery checklist</h2>
+          <button class="text-button" type="button" data-route="recovery">Open full recovery</button>
+        </div>
+        ${
+          isSaved
+            ? `<p class="fine-print checklist-note">Checklist progress is saved in this local case.</p>`
+            : `<p class="fine-print checklist-note">Save this case before using checklist tracking.</p>`
+        }
+        <div class="checklist">
+          ${packet.recoveryPlan.steps
+            .map(
+              (task, index) => `
+                <label class="task-row">
+                  <input type="checkbox" data-case-task="${index}" data-case-id="${escapeHtml(packet.id)}" ${packet.taskProgress?.[String(index)] ? "checked" : ""} ${isSaved ? "" : "disabled"}>
+                  <span>
+                    <strong>${escapeHtml(task.title)}</strong>
+                    <small>${escapeHtml(task.priority)} - ${escapeHtml(task.detail)}</small>
+                  </span>
+                </label>
+              `
+            )
+            .join("")}
+        </div>
+        ${renderPaymentPlaybooks(packet.recoveryPlan.paymentPlaybooks)}
+      </section>
+    `;
+  }
+
+  function renderCaseHelperSection(packet) {
+    return `
+      <section class="case-section-panel">
+        <div class="section-title-row">
+          <h2>Trusted-helper summary</h2>
+          <button class="text-button" type="button" data-route="helper">Open helper flow</button>
+        </div>
+        <p>Use this as a starting point, then remove secrets before showing it to someone you personally trust.</p>
+        <textarea id="helper-summary" rows="10">${escapeHtml(packet.helperSummary)}</textarea>
+        <div class="notice">
+          Copying only puts this summary on your clipboard. Verivae does not send it anywhere. ${sensitiveInfoReminder}
+        </div>
+        <button class="btn primary" type="button" data-action="copy-helper">Copy helper summary</button>
+      </section>
+    `;
+  }
+
+  function renderCaseTimelineSection(packet, savedPacket, isSaved) {
+    return `
+      <section class="case-section-panel">
+        <h2>Case timeline</h2>
+        <div class="timeline-list">
+          ${packet.timeline
+            .map(
+              (item) => `
+                <article class="timeline-item">
+                  <strong>${escapeHtml(item.title)}</strong>
+                  <small>${formatDate(item.at)}</small>
+                  <p>${escapeHtml(item.detail)}</p>
+                </article>
+              `
+            )
+            .join("")}
+        </div>
+        ${
+          isSaved
+            ? `<p class="fine-print">Saved locally ${formatDate(savedPacket.savedAt)}. Last updated ${formatDate(savedPacket.updatedAt)}.</p>`
+            : `<p class="fine-print">This case has not been saved locally yet.</p>`
+        }
+      </section>
+    `;
+  }
+
+  function renderCaseWorkspace(packet, savedPacket, isSaved, progress, checklistStatus) {
+    const activeSection = ["overview", "checklist", "helper", "timeline"].includes(state.caseSection)
+      ? state.caseSection
+      : "overview";
+    state.caseSection = activeSection;
+
+    const sections = {
+      overview: renderCaseOverviewSection(packet, checklistStatus),
+      checklist: renderCaseChecklistSection(packet, isSaved),
+      helper: renderCaseHelperSection(packet),
+      timeline: renderCaseTimelineSection(packet, savedPacket, isSaved)
+    };
+
+    return `
+      <section class="case-workspace">
+        ${renderCaseSectionNav(progress)}
+        ${sections[activeSection]}
+      </section>
+    `;
+  }
+
   function renderCasePacket() {
     const savedCases = storage.getCasePackets();
     const filteredCases = filterCases(savedCases);
@@ -1518,6 +1682,10 @@
         </section>
 
         <form id="case-details-form" class="form-card case-details-form">
+          <div>
+            <h2>Manage case</h2>
+            <p class="fine-print">Keep the case title, status, and private notes useful for your next step.</p>
+          </div>
           <div class="optional-grid">
             <label>
               Case title
@@ -1548,93 +1716,7 @@
           }
         </form>
 
-        <section class="plain-panel">
-          <h2>What happened</h2>
-          <p class="evidence-situation">${escapeHtml(checkItem.content)}</p>
-          ${checkItem.notes ? `<p class="fine-print"><strong>Notes:</strong> ${escapeHtml(checkItem.notes)}</p>` : ""}
-          <p class="fine-print"><strong>Already acted:</strong> ${escapeHtml(result.exposureActionLabels?.join(", ") || "Not sure yet")}</p>
-          <p class="fine-print">${escapeHtml(contextInferenceNote(result))}</p>
-        </section>
-
-        <section class="two-column">
-          <article class="plain-panel">
-            <h2>Main warning signs</h2>
-            ${renderList(result.judgment.mainWarningSigns)}
-          </article>
-          <article class="plain-panel">
-            <h2>Still unclear</h2>
-            ${renderList(
-              result.missingInformation.length
-                ? result.missingInformation
-                : [
-                    "No specific gaps were flagged, but this case is still based only on the details entered."
-                  ]
-            )}
-          </article>
-        </section>
-
-        <section class="two-column">
-          <article class="plain-panel">
-            <h2>Do not do this yet</h2>
-            ${renderList(result.doNotDo)}
-          </article>
-          <article class="plain-panel">
-            <h2>Safest next steps</h2>
-            ${renderList(result.safeVerificationSteps)}
-          </article>
-        </section>
-
-        <section class="checklist">
-          ${
-            isSaved
-              ? `<p class="fine-print checklist-note">Checklist progress is saved in this local case.</p>`
-              : `<p class="fine-print checklist-note">Save this case before using checklist tracking.</p>`
-          }
-          ${packet.recoveryPlan.steps
-            .map(
-              (task, index) => `
-                <label class="task-row">
-                  <input type="checkbox" data-case-task="${index}" data-case-id="${escapeHtml(packet.id)}" ${packet.taskProgress?.[String(index)] ? "checked" : ""} ${isSaved ? "" : "disabled"}>
-                  <span>
-                    <strong>${escapeHtml(task.title)}</strong>
-                    <small>${escapeHtml(task.priority)} - ${escapeHtml(task.detail)}</small>
-                  </span>
-                </label>
-              `
-            )
-            .join("")}
-        </section>
-
-        ${renderPaymentPlaybooks(packet.recoveryPlan.paymentPlaybooks)}
-
-        <section class="plain-panel">
-          <h2>Trusted-helper summary</h2>
-          <p>Use this as a starting point, then remove secrets before showing it to someone you personally trust.</p>
-          <textarea id="helper-summary" rows="8">${escapeHtml(packet.helperSummary)}</textarea>
-          <button class="btn secondary" type="button" data-action="copy-helper">Copy helper summary</button>
-        </section>
-
-        <section class="plain-panel">
-          <h2>Case timeline</h2>
-          <div class="timeline-list">
-            ${packet.timeline
-              .map(
-                (item) => `
-                  <article class="timeline-item">
-                    <strong>${escapeHtml(item.title)}</strong>
-                    <small>${formatDate(item.at)}</small>
-                    <p>${escapeHtml(item.detail)}</p>
-                  </article>
-                `
-              )
-              .join("")}
-          </div>
-          ${
-            isSaved
-              ? `<p class="fine-print">Saved locally ${formatDate(savedPacket.savedAt)}. Last updated ${formatDate(savedPacket.updatedAt)}.</p>`
-              : `<p class="fine-print">This case has not been saved locally yet.</p>`
-          }
-        </section>
+        ${renderCaseWorkspace(packet, savedPacket, isSaved, progress, checklistStatus)}
       `,
       `
         <button class="btn primary" type="button" data-action="save-case">${isSaved ? "Update local case" : "Save local case"}</button>
@@ -2262,6 +2344,7 @@
     document.querySelectorAll("[data-open-case]").forEach((element) => {
       element.addEventListener("click", () => {
         state.selectedCasePacketId = element.dataset.openCase;
+        state.caseSection = "overview";
         render();
       });
     });
@@ -2269,7 +2352,15 @@
     document.querySelectorAll("[data-open-case-route]").forEach((element) => {
       element.addEventListener("click", () => {
         state.selectedCasePacketId = element.dataset.openCaseRoute;
+        state.caseSection = "overview";
         navigate("case");
+      });
+    });
+
+    document.querySelectorAll("[data-case-section]").forEach((element) => {
+      element.addEventListener("click", () => {
+        state.caseSection = element.dataset.caseSection;
+        render();
       });
     });
 
