@@ -10,6 +10,7 @@
     helperSummary: "",
     toast: "",
     vaultFilter: "all",
+    caseFilter: "all",
     selectedCasePacketId: null,
     pendingSampleIndex: null
   };
@@ -207,6 +208,14 @@
     not_scam: "Not a scam"
   };
 
+  const caseFilterOptions = {
+    all: "All",
+    high: "High risk",
+    info: "Needs more info",
+    progress: "In progress",
+    resolved: "Resolved"
+  };
+
   function routeName() {
     return (window.location.hash || "#home").replace("#", "") || "home";
   }
@@ -273,11 +282,24 @@
   }
 
   function getLatestContext() {
+    if (state.selectedCasePacketId) {
+      const selectedPacket = storage.getCasePacket(state.selectedCasePacketId);
+      if (selectedPacket) {
+        return {
+          checkItem: selectedPacket.checkItem,
+          result: selectedPacket.result,
+          evidenceSummary: selectedPacket.evidenceSummary,
+          casePacket: selectedPacket
+        };
+      }
+    }
+
     if (state.currentCheck && state.currentResult) {
       return {
         checkItem: state.currentCheck,
         result: state.currentResult,
-        evidenceSummary: detection.summarizeForEvidence(state.currentCheck, state.currentResult)
+        evidenceSummary: detection.summarizeForEvidence(state.currentCheck, state.currentResult),
+        casePacket: null
       };
     }
 
@@ -291,7 +313,8 @@
       return {
         checkItem: latestPacket.checkItem,
         result: latestPacket.result,
-        evidenceSummary: latestPacket.evidenceSummary
+        evidenceSummary: latestPacket.evidenceSummary,
+        casePacket: latestPacket
       };
     }
 
@@ -311,6 +334,7 @@
 
     return {
       id: `case-${result.id}`,
+      caseTitle: existing?.caseTitle || suggestCaseTitle(checkItem, result, evidenceSummary),
       status: existing?.status || "reviewing",
       statusLabel: caseStatusOptions[existing?.status] || caseStatusOptions.reviewing,
       caseNotes: existing?.caseNotes || "",
@@ -329,9 +353,9 @@
           detail: `${result.riskLabel} with ${result.confidence.toLowerCase()} confidence.`
         },
         {
-          title: "Case packet prepared",
+          title: "Case workspace prepared",
           at: existing?.updatedAt || new Date().toISOString(),
-          detail: "Local-only packet with judgment, evidence notes, recovery steps, and helper summary."
+          detail: "Local-only case with judgment, evidence notes, recovery steps, and helper summary."
         }
       ]
     };
@@ -347,6 +371,88 @@
       total: steps.length,
       label: steps.length ? `${completed} of ${steps.length} recovery steps checked` : "No recovery steps available"
     };
+  }
+
+  function suggestCaseTitle(checkItem, result, evidenceSummary) {
+    if (evidenceSummary?.headline) {
+      return evidenceSummary.headline;
+    }
+
+    const source = result.sourceLabel || "Scam check";
+    const action = result.requestedActionLabel || "review";
+    return `${source}: ${action}`;
+  }
+
+  function caseNextAction(packet) {
+    const progress = getCaseProgress(packet);
+    const status = packet?.status || "reviewing";
+
+    if (status === "resolved") {
+      return "Review the saved notes and keep the case only as long as it is useful.";
+    }
+
+    if (status === "not_scam") {
+      return "Keep the record if it helps you remember what you verified, or delete it when you no longer need it.";
+    }
+
+    if (status === "waiting_bank") {
+      return "Wait for the bank or payment app response, and avoid follow-up links or numbers from the suspicious request.";
+    }
+
+    if (status === "waiting_helper") {
+      return "Share only the safe helper summary with someone you personally trust.";
+    }
+
+    if (packet.result.riskLevel === "not_enough_information") {
+      return "Add safer details about source, request, timing, and whether you already acted.";
+    }
+
+    if (progress.completed > 0) {
+      return "Continue the recovery checklist and save brief notes about official contacts or verification.";
+    }
+
+    if (packet.result.shouldUseRecovery) {
+      return "Start with the first recovery steps: stop contact, avoid more money or codes, and preserve evidence.";
+    }
+
+    return "Verify through a channel you choose yourself before responding or deleting the case.";
+  }
+
+  function caseMatchesFilter(packet, filter) {
+    const progress = getCaseProgress(packet);
+    const status = packet?.status || "reviewing";
+
+    if (filter === "high") {
+      return packet.result.riskLevel === "high_risk";
+    }
+
+    if (filter === "info") {
+      return packet.result.riskLevel === "not_enough_information";
+    }
+
+    if (filter === "progress") {
+      return !["resolved", "not_scam"].includes(status) && (["reviewing", "waiting_bank", "waiting_helper"].includes(status) || progress.completed > 0);
+    }
+
+    if (filter === "resolved") {
+      return ["resolved", "not_scam"].includes(status);
+    }
+
+    return true;
+  }
+
+  function filterCases(cases) {
+    return cases.filter((packet) => caseMatchesFilter(packet, state.caseFilter));
+  }
+
+  function caseFilterCount(cases, filter) {
+    return cases.filter((packet) => caseMatchesFilter(packet, filter)).length;
+  }
+
+  function completedCaseTasks(packet) {
+    const steps = packet?.recoveryPlan?.steps || [];
+    const progress = packet?.taskProgress || {};
+    return steps.filter((_, index) => progress[String(index)]);
   }
 
   function deriveCaseStatus(packet) {
@@ -369,6 +475,46 @@
 
   function caseStatusLabel(packet) {
     return caseStatusOptions[packet?.status] || packet?.statusLabel || caseStatusOptions.reviewing;
+  }
+
+  function renderSavedCaseCard(saved, activeId) {
+    const progress = getCaseProgress(saved);
+    const updatedAt = saved.updatedAt || saved.savedAt || saved.createdAt;
+    const summary = saved.checkItem.content.slice(0, 112);
+    const title = saved.caseTitle || suggestCaseTitle(saved.checkItem, saved.result, saved.evidenceSummary);
+    const notesPreview = saved.caseNotes
+      ? `<small class="case-notes-preview">Notes: ${escapeHtml(saved.caseNotes.slice(0, 112))}${saved.caseNotes.length > 112 ? "..." : ""}</small>`
+      : `<small class="case-notes-preview muted-preview">No private notes added yet</small>`;
+
+    return `
+      <article class="case-list-item ${saved.id === activeId ? "selected" : ""}">
+        <button class="case-picker" type="button" data-open-case="${escapeHtml(saved.id)}">
+          <strong>${escapeHtml(title)}</strong>
+          <span>${escapeHtml(summary)}${saved.checkItem.content.length > 112 ? "..." : ""}</span>
+          <dl class="case-card-meta">
+            <div>
+              <dt>Status</dt>
+              <dd>${escapeHtml(caseStatusLabel(saved))}</dd>
+            </div>
+            <div>
+              <dt>Risk</dt>
+              <dd>${escapeHtml(saved.result.riskLabel)}</dd>
+            </div>
+            <div>
+              <dt>Updated</dt>
+              <dd>${formatDate(updatedAt)}</dd>
+            </div>
+            <div>
+              <dt>Checklist</dt>
+              <dd>${progress.total ? `${progress.completed}/${progress.total}` : "Not started"}</dd>
+            </div>
+          </dl>
+          <small class="case-next-action">Next: ${escapeHtml(caseNextAction(saved))}</small>
+          ${notesPreview}
+        </button>
+        <button class="text-button danger-action" type="button" data-delete-case="${escapeHtml(saved.id)}">Delete</button>
+      </article>
+    `;
   }
 
   function getLatestCasePacket() {
@@ -435,7 +581,7 @@
           </article>
           <article>
             <span class="status-number">${casePackets.length}</span>
-            <span>Case packets saved locally</span>
+            <span>Cases saved locally</span>
           </article>
           <article>
             <span class="status-label">Manual only</span>
@@ -463,7 +609,7 @@
 
         <section class="quick-links" aria-label="Secondary areas">
           ${button("Evidence vault", "vault")}
-          ${button("Case packet", "case")}
+          ${button("Cases", "case")}
           ${button("Report prep", "report")}
           ${button("Trusted helper", "helper")}
           ${button("Scam education", "education")}
@@ -704,7 +850,9 @@
     `;
   }
 
-  function renderRecoveryGroups(groups = []) {
+  function renderRecoveryGroups(groups = [], casePacket = null) {
+    let flatTaskIndex = 0;
+
     return `
       <section class="recovery-groups">
         ${groups
@@ -719,15 +867,25 @@
                 <div class="checklist">
                   ${group.steps
                     .map(
-                      (task, taskIndex) => `
-                        <label class="task-row">
-                          <input type="checkbox" data-recovery-task="${groupIndex}-${taskIndex}">
-                          <span>
-                            <strong>${escapeHtml(task.title)}</strong>
-                            <small>${escapeHtml(task.priority)} - ${escapeHtml(task.detail)}</small>
-                          </span>
-                        </label>
-                      `
+                      (task, taskIndex) => {
+                        const caseTaskIndex = flatTaskIndex;
+                        const checked = casePacket?.taskProgress?.[String(caseTaskIndex)];
+                        flatTaskIndex += 1;
+
+                        return `
+                          <label class="task-row">
+                            <input type="checkbox" ${
+                              casePacket
+                                ? `data-case-task="${caseTaskIndex}" data-case-id="${escapeHtml(casePacket.id)}" ${checked ? "checked" : ""}`
+                                : `data-recovery-task="${groupIndex}-${taskIndex}"`
+                            }>
+                            <span>
+                              <strong>${escapeHtml(task.title)}</strong>
+                              <small>${escapeHtml(task.priority)} - ${escapeHtml(task.detail)}</small>
+                            </span>
+                          </label>
+                        `;
+                      }
                     )
                     .join("")}
                 </div>
@@ -830,7 +988,7 @@
       `,
       `
         <button class="btn primary" type="button" data-action="copy-report">Copy report draft</button>
-        <button class="btn secondary" type="button" data-route="case">Open case packet</button>
+        <button class="btn secondary" type="button" data-route="case">Open cases</button>
         <button class="btn secondary" type="button" data-route="recovery">Open recovery steps</button>
         <button class="btn secondary" type="button" data-route="helper">Prepare helper summary</button>
       `
@@ -846,9 +1004,9 @@
     const recoveryBody = result.shouldUseRecovery
       ? "Open recovery steps if you already clicked, paid, shared a code, opened a file, installed an app, or feel unsure what happened."
       : "Use recovery if you already acted or want a calm checklist, but this result does not automatically mean recovery is required.";
-    const caseTitle = "Case packet: useful for review";
+    const caseTitle = "Cases: useful for review";
     const caseBody =
-      "Prepare one local view that gathers what happened, the risk judgment, evidence notes, recovery steps, and a trusted-helper summary.";
+      "Prepare one local case view that gathers what happened, the risk judgment, evidence notes, recovery steps, and a trusted-helper summary.";
 
     return `
       <section class="plain-panel">
@@ -971,7 +1129,7 @@
       `,
       `
         <button class="btn primary" type="button" data-action="save-evidence">Save local evidence</button>
-        <button class="btn secondary" type="button" data-route="case">Open case packet</button>
+        <button class="btn secondary" type="button" data-route="case">Open cases</button>
         <button class="btn secondary" type="button" data-route="report">Prepare report draft</button>
         <button class="btn secondary" type="button" data-route="recovery">Open recovery steps</button>
         <button class="btn secondary" type="button" data-route="helper">Prepare helper summary</button>
@@ -1117,18 +1275,19 @@
   }
 
   function renderCasePacket() {
-    const savedPackets = storage.getCasePackets();
+    const savedCases = storage.getCasePackets();
+    const filteredCases = filterCases(savedCases);
     const packet = getLatestCasePacket();
 
     if (!packet) {
       return pageShell(
-        "Case packet",
-        "Local review workspace",
+        "Cases",
+        "Local case workspace",
         `
           <section class="empty-state">
-            <h2>No case packet yet</h2>
-            <p>Run a scam check first. Verivae can then prepare a local packet with what happened, the risk judgment, recovery steps, and a trusted-helper summary.</p>
-            <p class="fine-print">Case packets stay in this browser for the prototype. They are not sent anywhere automatically.</p>
+            <h2>No cases yet</h2>
+            <p>Run a scam check first. Verivae can then prepare a local case with what happened, the risk judgment, recovery steps, and a trusted-helper summary.</p>
+            <p class="fine-print">Cases stay in this browser for the prototype. They are not sent anywhere automatically.</p>
             ${button("Start a scam check", "check", "primary")}
           </section>
         `
@@ -1142,52 +1301,60 @@
     const progress = getCaseProgress(packet);
     const checklistStatus = deriveCaseStatus(packet);
     const selectedStatus = caseStatusOptions[packet.status] ? packet.status : "reviewing";
+    const caseTitle = packet.caseTitle || suggestCaseTitle(checkItem, result, packet.evidenceSummary);
+    const nextAction = caseNextAction(packet);
 
     return pageShell(
-      "Case packet",
-      "Local review workspace",
+      "Cases",
+      "Local case workspace",
       `
         <section class="notice">
-          This packet is only a local prototype record. Review it before sharing, and ${sensitiveInfoReminder.toLowerCase()}
+          ${isSaved ? "This saved case" : "This latest-check preview"} is only a local prototype record. Review it before sharing, and ${sensitiveInfoReminder.toLowerCase()}
         </section>
 
         ${
-          savedPackets.length
+          savedCases.length
             ? `<section class="plain-panel">
                 <div class="section-title-row">
-                  <h2>Saved case packets</h2>
-                  <span class="case-count">${savedPackets.length} local</span>
+                  <h2>Saved cases</h2>
+                  <span class="case-count">${filteredCases.length} of ${savedCases.length} local</span>
                 </div>
-                <p>Saved packets stay in this browser. Open one to review its evidence, recovery tasks, helper summary, and report draft starting point.</p>
-                <div class="case-list">
-                  ${savedPackets
+                <p>Saved cases stay in this browser. Open one to review its evidence, recovery tasks, helper summary, and report draft starting point.</p>
+                <div class="case-filter-bar" aria-label="Case filters">
+                  ${Object.entries(caseFilterOptions)
                     .map(
-                      (saved) => `
-                        <article class="case-list-item ${saved.id === packet.id ? "selected" : ""}">
-                          <button class="case-picker" type="button" data-open-case="${escapeHtml(saved.id)}">
-                            <strong>${escapeHtml(saved.evidenceSummary?.headline || saved.result.riskLabel)}</strong>
-                            <span>${escapeHtml(saved.checkItem.content.slice(0, 92))}${saved.checkItem.content.length > 92 ? "..." : ""}</span>
-                            <small>${escapeHtml(caseStatusLabel(saved))} - ${formatDate(saved.savedAt)} - ${escapeHtml(saved.result.confidence)} confidence - ${escapeHtml(getCaseProgress(saved).label)}</small>
-                            ${saved.caseNotes ? `<small>Notes: ${escapeHtml(saved.caseNotes.slice(0, 96))}${saved.caseNotes.length > 96 ? "..." : ""}</small>` : ""}
-                          </button>
-                          <button class="text-button danger-action" type="button" data-delete-case="${escapeHtml(saved.id)}">Delete</button>
-                        </article>
+                      ([value, label]) => `
+                        <button class="filter-chip ${state.caseFilter === value ? "active" : ""}" type="button" data-case-filter="${value}">
+                          ${escapeHtml(label)}
+                          <span>${caseFilterCount(savedCases, value)}</span>
+                        </button>
                       `
                     )
                     .join("")}
                 </div>
+                <div class="case-list">
+                  ${
+                    filteredCases.length
+                      ? filteredCases.map((saved) => renderSavedCaseCard(saved, packet.id)).join("")
+                      : `<section class="empty-state compact-empty">
+                          <h2>No cases in this view</h2>
+                          <p>Try another filter or save a new check when you need a case record.</p>
+                        </section>`
+                  }
+                </div>
               </section>`
             : `<section class="empty-state compact-empty">
-                <h2>No saved packets yet</h2>
-                <p>This view is a prepared packet from the latest check. Save it if you want a local case record to revisit later.</p>
+                <h2>No saved cases yet</h2>
+                <p>This view is a prepared case from the latest check. Save it if you want a local record to revisit later.</p>
               </section>`
         }
 
         <section class="case-overview ${levelClass(result.riskLevel)}">
           <div>
-            <span class="result-kicker">Current status</span>
-            <h2>${escapeHtml(caseStatusLabel(packet))}</h2>
+            <span class="result-kicker">${isSaved ? "Selected saved case" : "Latest check preview"}</span>
+            <h2>${escapeHtml(caseTitle)}</h2>
             <p>${escapeHtml(result.primaryGuidance)}</p>
+            <p class="fine-print"><strong>Status:</strong> ${escapeHtml(caseStatusLabel(packet))}. <strong>Next:</strong> ${escapeHtml(nextAction)}</p>
             <p class="fine-print">Checklist: ${escapeHtml(progress.label)}. Progress state: ${escapeHtml(checklistStatus)}.</p>
           </div>
           <dl class="evidence-meta">
@@ -1217,6 +1384,11 @@
         <form id="case-details-form" class="form-card case-details-form">
           <div class="optional-grid">
             <label>
+              Case title
+              <input name="caseTitle" ${isSaved ? "" : "disabled"} value="${escapeHtml(caseTitle)}" placeholder="Give this case a short name">
+              <small>Use a plain title, not passwords, codes, account numbers, or private keys.</small>
+            </label>
+            <label>
               Case status
               <select name="caseStatus" ${isSaved ? "" : "disabled"}>
                 ${Object.entries(caseStatusOptions)
@@ -1236,7 +1408,7 @@
           ${
             isSaved
               ? `<button class="btn primary" type="submit">Save case details</button>`
-              : `<p class="fine-print">Save this case packet before adding notes or changing status.</p>`
+              : `<p class="fine-print">Save this case before adding notes or changing status.</p>`
           }
         </form>
 
@@ -1259,7 +1431,7 @@
               result.missingInformation.length
                 ? result.missingInformation
                 : [
-                    "No specific gaps were flagged, but this packet is still based only on the details entered."
+                    "No specific gaps were flagged, but this case is still based only on the details entered."
                   ]
             )}
           </article>
@@ -1279,8 +1451,8 @@
         <section class="checklist">
           ${
             isSaved
-              ? `<p class="fine-print checklist-note">Checklist progress is saved in this local case packet.</p>`
-              : `<p class="fine-print checklist-note">Save this case packet before using checklist tracking.</p>`
+              ? `<p class="fine-print checklist-note">Checklist progress is saved in this local case.</p>`
+              : `<p class="fine-print checklist-note">Save this case before using checklist tracking.</p>`
           }
           ${packet.recoveryPlan.steps
             .map(
@@ -1307,7 +1479,7 @@
         </section>
 
         <section class="plain-panel">
-          <h2>Packet timeline</h2>
+          <h2>Case timeline</h2>
           <div class="timeline-list">
             ${packet.timeline
               .map(
@@ -1324,12 +1496,12 @@
           ${
             isSaved
               ? `<p class="fine-print">Saved locally ${formatDate(savedPacket.savedAt)}. Last updated ${formatDate(savedPacket.updatedAt)}.</p>`
-              : `<p class="fine-print">This packet has not been saved locally yet.</p>`
+              : `<p class="fine-print">This case has not been saved locally yet.</p>`
           }
         </section>
       `,
       `
-        <button class="btn primary" type="button" data-action="save-case">${isSaved ? "Update local case packet" : "Save local case packet"}</button>
+        <button class="btn primary" type="button" data-action="save-case">${isSaved ? "Update local case" : "Save local case"}</button>
         ${
           state.currentCheck && state.currentResult
             ? `<button class="btn secondary" type="button" data-action="save-evidence">Save evidence</button>`
@@ -1345,10 +1517,13 @@
   function renderRecovery() {
     const context = getLatestContext();
     const plan = detection.buildRecoveryPlan(context?.result);
+    const casePacket = context?.casePacket || null;
+    const caseProgress = casePacket ? getCaseProgress(casePacket) : null;
+    const doneTasks = casePacket ? completedCaseTasks(casePacket) : [];
 
     return pageShell(
-      "Recovery workspace",
-      "After something may have gone wrong",
+      casePacket ? "Recovery for this case" : "Recovery workspace",
+      casePacket ? "Continue saved case" : "After something may have gone wrong",
       `
         <section class="notice">
           Verivae can help organize recovery steps, but it cannot guarantee refunds, account recovery, law-enforcement action, or device cleanup.
@@ -1361,9 +1536,17 @@
         ${
           context
             ? `<section class="plain-panel">
-                <h2>Latest check context</h2>
-                <p>${escapeHtml(context.evidenceSummary?.headline || context.result.riskLabel)}</p>
+                <h2>${casePacket ? "Case context" : "Latest check context"}</h2>
+                <p>${escapeHtml(casePacket?.caseTitle || context.evidenceSummary?.headline || context.result.riskLabel)}</p>
                 <dl class="evidence-meta">
+                  ${
+                    casePacket
+                      ? `<div>
+                          <dt>Status</dt>
+                          <dd>${escapeHtml(caseStatusLabel(casePacket))}</dd>
+                        </div>`
+                      : ""
+                  }
                   <div>
                     <dt>Confidence</dt>
                     <dd>${escapeHtml(context.result.confidence)}</dd>
@@ -1385,11 +1568,30 @@
                 <p class="fine-print"><strong>Current situation:</strong> ${escapeHtml(context.result.exposureSummary || "")}</p>
                 <p class="fine-print"><strong>Warning signs:</strong> ${escapeHtml(context.evidenceSummary?.signals || signalSummary(context.result))}</p>
                 <p class="fine-print"><strong>Guidance:</strong> ${escapeHtml(context.result.primaryGuidance)}</p>
+                ${
+                  casePacket
+                    ? `<p class="fine-print"><strong>Next case action:</strong> ${escapeHtml(caseNextAction(casePacket))}</p>`
+                    : ""
+                }
+              </section>`
+            : ""
+        }
+        ${
+          casePacket
+            ? `<section class="plain-panel">
+                <h2>What you have already done</h2>
+                <p>${escapeHtml(caseProgress.label)} for this saved case.</p>
+                ${
+                  doneTasks.length
+                    ? renderList(doneTasks.map((task) => `${task.title}: ${task.detail}`))
+                    : `<p class="fine-print">No recovery tasks have been checked yet. Start with the first step you can safely verify.</p>`
+                }
+                ${casePacket.caseNotes ? `<p class="fine-print"><strong>Case notes:</strong> ${escapeHtml(casePacket.caseNotes)}</p>` : ""}
               </section>`
             : ""
         }
         ${renderPaymentPlaybooks(plan.paymentPlaybooks)}
-        ${renderRecoveryGroups(plan.groups)}
+        ${renderRecoveryGroups(plan.groups, casePacket)}
         <section class="plain-panel">
           <h2>Helpful records to gather</h2>
           <p>Save only what is useful: screenshots, dates, contact details, transaction IDs, payment app names, links, and a plain summary of what happened. ${sensitiveInfoReminder}</p>
@@ -1402,7 +1604,7 @@
               ? `<button class="btn primary" type="button" data-action="save-evidence">Save latest check</button>`
               : ""
           }
-          <button class="btn secondary" type="button" data-route="case">Open case packet</button>
+          <button class="btn secondary" type="button" data-route="case">Open cases</button>
           <button class="btn secondary" type="button" data-route="report">Prepare report draft</button>
           <button class="btn secondary" type="button" data-route="helper">Prepare helper summary</button>
         `
@@ -1510,7 +1712,7 @@
         ? `
           <button class="btn primary" type="button" data-action="copy-helper">Copy summary</button>
           <button class="btn secondary" type="button" data-route="report">Prepare report draft</button>
-          <button class="btn secondary" type="button" data-route="case">Open case packet</button>
+          <button class="btn secondary" type="button" data-route="case">Open cases</button>
           <button class="btn secondary" type="button" data-route="recovery">Open recovery steps</button>
         `
         : ""
@@ -1634,7 +1836,7 @@
   function saveCurrentCasePacket() {
     const context = getLatestContext();
     if (!context) {
-      setToast("Run a check before creating a case packet.");
+      setToast("Run a check before creating a case.");
       return;
     }
 
@@ -1646,14 +1848,15 @@
 
     storage.saveCasePacket(buildCasePacket(context));
     state.selectedCasePacketId = `case-${context.result.id}`;
-    setToast("Case packet saved locally.");
+    setToast("Case saved locally.");
     navigate("case");
+    render();
   }
 
   function handleCaseTaskToggle(input) {
     const packet = storage.getCasePacket(input.dataset.caseId);
     if (!packet) {
-      setToast("Save the case packet before tracking checklist progress.");
+      setToast("Save the case before tracking checklist progress.");
       render();
       return;
     }
@@ -1684,17 +1887,19 @@
 
     const packet = storage.getCasePacket(context.id);
     if (!packet) {
-      setToast("Save the case packet before adding case details.");
+      setToast("Save the case before adding case details.");
       return;
     }
 
     const formData = new FormData(form);
     const requestedStatus = String(formData.get("caseStatus") || "reviewing");
+    const caseTitle = String(formData.get("caseTitle") || "").trim();
     const caseNotes = String(formData.get("caseNotes") || "").trim();
     const status = caseStatusOptions[requestedStatus] ? requestedStatus : "reviewing";
 
     storage.saveCasePacket({
       ...packet,
+      caseTitle: caseTitle || suggestCaseTitle(packet.checkItem, packet.result, packet.evidenceSummary),
       status,
       statusLabel: caseStatusOptions[status],
       caseNotes
@@ -1725,6 +1930,7 @@
     state.currentCheck = checkItem;
     state.currentResult = detection.assessScamRisk(checkItem);
     state.helperSummary = detection.buildHelperSummary(checkItem, state.currentResult);
+    state.selectedCasePacketId = null;
     navigate("result");
   }
 
@@ -1866,10 +2072,17 @@
       });
     });
 
+    document.querySelectorAll("[data-case-filter]").forEach((element) => {
+      element.addEventListener("click", () => {
+        state.caseFilter = element.dataset.caseFilter;
+        render();
+      });
+    });
+
     document.querySelectorAll("[data-delete-case]").forEach((element) => {
       element.addEventListener("click", () => {
         const shouldDelete = window.confirm(
-          "Delete this case packet from this browser? This only removes the local prototype copy."
+          "Delete this case from this browser? This only removes the local prototype copy."
         );
         if (shouldDelete) {
           storage.deleteCasePacket(element.dataset.deleteCase);
@@ -1877,7 +2090,7 @@
             state.selectedCasePacketId = null;
           }
           render();
-          setToast("Case packet deleted.");
+          setToast("Case deleted.");
         }
       });
     });

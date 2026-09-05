@@ -776,11 +776,13 @@ test("local storage saves, updates, reads, and deletes case packets", () => {
 
   storage.saveCasePacket({
     ...packet,
+    caseTitle: "Bank code request",
     status: "waiting_bank",
     statusLabel: "Waiting on bank",
     caseNotes: "Called the bank through the number on the card.",
     taskProgress: { 0: true, 2: true }
   });
+  assert.equal(storage.getCasePacket(packet.id).caseTitle, "Bank code request");
   assert.equal(storage.getCasePacket(packet.id).status, "waiting_bank");
   assert.equal(storage.getCasePacket(packet.id).statusLabel, "Waiting on bank");
   assert.equal(storage.getCasePacket(packet.id).caseNotes, "Called the bank through the number on the card.");
