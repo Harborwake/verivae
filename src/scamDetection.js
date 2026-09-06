@@ -318,6 +318,13 @@
     return normalized && normalized !== fallback;
   }
 
+  function statesNoLinkConcern(content) {
+    return (
+      /\b(no|without|not any)\b.{0,50}\b(links?|urls?|websites?|qr codes?)\b/i.test(content) ||
+      /\b(no links?|no link is included|no link included|without a link|no one sent me a link|does not ask me to .*link|doesn't ask me to .*link|not ask me to .*link)\b/i.test(content)
+    );
+  }
+
   function inferSourceType(content, provided) {
     if (hasExplicitValue(provided, "other")) {
       return provided;
@@ -339,7 +346,7 @@
       return "call";
     }
 
-    if (/(https?:\/\/|www\.|bit\.ly|tinyurl|link|website)/i.test(content) && !/\b(no links?|no link is included|no link included|without a link)\b/i.test(content)) {
+    if (/(https?:\/\/|www\.|bit\.ly|tinyurl|link|website)/i.test(content) && !statesNoLinkConcern(content)) {
       return "link";
     }
 
@@ -583,7 +590,7 @@
 
   function removeBenignContextSignals(signals, content) {
     const saysNoLink =
-      /\b(no links?|no link is included|no link included|without a link|no one sent me a link|does not ask me to .*link|doesn't ask me to .*link|not ask me to .*link)\b/i.test(content) &&
+      statesNoLinkConcern(content) &&
       !/(https?:\/\/|www\.|bit\.ly|tinyurl|t\.co|goo\.gl|ow\.ly|is\.gd|buff\.ly|cutt\.ly|qr code|scan this qr|scan the qr)/i.test(content);
     const knownExpectedFile =
       /\b(regular vendor|usual email|expect(?:ed|ing) it|monthly invoice)\b/i.test(content) &&
@@ -661,19 +668,27 @@
   function buildMissingInformation(item, level, signals) {
     const missing = [];
     const content = normalize(item.content);
-    const providedSource = normalize(item.providedSourceType || item.sourceType);
-    const providedAction = normalize(item.providedRequestedAction || item.requestedAction);
+    const source = normalize(item.sourceType);
+    const action = normalize(item.requestedAction);
 
     if (content.length < 45) {
       missing.push("Add the exact wording, who contacted you, and how they reached you if you can do that safely.");
     }
 
-    if (!providedSource || providedSource === "other") {
+    if (!source || source === "other") {
       missing.push("If you know it, add where this came from: text, email, call, link, QR code, payment request, or file.");
     }
 
-    if (!providedAction || providedAction === "not_sure") {
+    if (!action || action === "not_sure") {
       missing.push("Describe what they want you to do next, such as pay, click, call, reply, open a file, or share information.");
+    }
+
+    if (
+      (level === LEVELS.HIGH || level === LEVELS.CAUTION) &&
+      !getMeaningfulExposureActions(item.exposureActions).length &&
+      !normalizeExposureActions(item.exposureActions).includes("not_acted")
+    ) {
+      missing.push("It is still unclear whether you already clicked, paid, replied, shared information, opened a file, or installed anything.");
     }
 
     if (level === LEVELS.CAUTION && !signals.some((signal) => signal.id === "impersonation")) {
@@ -694,8 +709,8 @@
   function buildFollowUpQuestions(item, level, signals) {
     const questions = [];
     const content = normalize(item.content);
-    const providedSource = normalize(item.providedSourceType || item.sourceType);
-    const providedAction = normalize(item.providedRequestedAction || item.requestedAction);
+    const source = normalize(item.sourceType);
+    const action = normalize(item.requestedAction);
     const hasSignal = (id) => signals.some((signal) => signal.id === id);
     const addQuestion = (id, prompt, hint) => {
       if (!questions.some((question) => question.id === id)) {
@@ -711,7 +726,7 @@
       );
     }
 
-    if (!providedSource || providedSource === "other") {
+    if (!source || source === "other") {
       addQuestion(
         "source",
         "How did this reach you?",
@@ -719,7 +734,7 @@
       );
     }
 
-    if (!providedAction || providedAction === "not_sure") {
+    if (!action || action === "not_sure") {
       addQuestion(
         "requested_action",
         "What are they asking you to do next?",
@@ -824,14 +839,14 @@
     const labels = getExposureLabels(normalized).join("; ");
 
     if (normalized.includes("not_acted")) {
-      return "The user says they paused before acting. Focus on verification before any next step.";
+      return "You said you paused before acting. Focus on verification before any next step.";
     }
 
     if (getMeaningfulExposureActions(normalized).length) {
-      return `The user may have already acted: ${labels}. Focus on stopping more harm and using official recovery paths.`;
+      return `You may have already acted: ${labels}. Focus on stopping more harm and using official recovery paths.`;
     }
 
-    return "It is not clear whether the user already acted. Ask for a safe yes/no summary before tailoring recovery steps.";
+    return "It is not clear whether you already acted. Add a safe yes/no summary before tailoring recovery steps.";
   }
 
   function buildDoNotDo(level, signals, exposureActions = ["not_sure"]) {

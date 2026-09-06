@@ -13,7 +13,8 @@
     caseFilter: "all",
     caseSection: "overview",
     selectedCasePacketId: null,
-    pendingSampleIndex: null
+    selectedEvidenceId: null,
+    toastTimer: null
   };
 
   const routes = {
@@ -21,6 +22,7 @@
     check: renderCheck,
     result: renderResult,
     vault: renderVault,
+    evidence: renderEvidenceDetail,
     case: renderCasePacket,
     recovery: renderRecovery,
     report: renderReportPrep,
@@ -127,70 +129,70 @@
       title: "Gift cards",
       body:
         "A real boss, agency, or support team should not need gift card numbers to solve an urgent problem.",
-      example: "Example: Buy Apple or Google Play cards today and send the codes.",
+      example: "Buy Apple or Google Play cards today and send the codes.",
       action: "Pause and verify with the person using a contact method you already trust."
     },
     {
       title: "Bank fraud alerts",
       body:
         "Fake bank alerts often use fear to get codes, transfers, or calls to a fake number.",
-      example: "Example: Your card will be locked unless you read us the verification code.",
+      example: "Your card will be locked unless you read us the verification code.",
       action: "Use the number on your card, statement, or official app."
     },
     {
       title: "Delivery fees",
       body:
         "Small package fees can be used to collect card details or push you to a fake page.",
-      example: "Example: USPS package held for a fee, pay through this short link.",
+      example: "USPS package held for a fee, pay through this short link.",
       action: "Open the carrier app or type the official website yourself."
     },
     {
       title: "Fake jobs and checks",
       body:
         "A check can appear in an account before it fully clears. Sending money back can create real loss.",
-      example: "Example: Deposit this check, buy equipment, and refund the leftover money.",
+      example: "Deposit this check, buy equipment, and refund the leftover money.",
       action: "Wait, verify the employer, and ask your bank before moving funds."
     },
     {
       title: "Marketplace deals",
       body:
         "Overpayments, business-account upgrade fees, and outside shipping agents are common warning signs.",
-      example: "Example: I overpaid by Zelle business. Refund my shipping agent.",
+      example: "I overpaid by Zelle business. Refund my shipping agent.",
       action: "Keep payments and messages inside the marketplace when possible."
     },
     {
       title: "Romance or emergencies",
       body:
         "Emotional pressure can make it hard to slow down, especially when someone says they cannot call or video chat.",
-      example: "Example: I am stranded overseas. Send crypto now and keep it private.",
+      example: "I am stranded overseas. Send crypto now and keep it private.",
       action: "Verify the person through a known number, video call, or trusted mutual contact."
     },
     {
       title: "Tech support",
       body:
         "Unexpected support messages that ask for remote access can expose accounts, files, and payment apps.",
-      example: "Example: Install AnyDesk so we can remove viruses from your device.",
+      example: "Install AnyDesk so we can remove viruses from your device.",
       action: "Do not install remote-access apps from an unexpected request."
     },
     {
       title: "Crypto and investments",
       body:
         "Guaranteed returns, secret platforms, and withdrawal fees are high-attention signs.",
-      example: "Example: Send USDT today to unlock daily guaranteed profit.",
+      example: "Send USDT today to unlock daily guaranteed profit.",
       action: "Do not add funds or pay fees until you verify through independent sources."
     },
     {
       title: "QR codes",
       body:
         "QR codes can hide where a link or payment goes, especially on stickers, signs, or urgent notices.",
-      example: "Example: Meter broken. Scan this QR code to pay the parking fee.",
+      example: "Meter broken. Scan this QR code to pay the parking fee.",
       action: "Use the official app or typed website instead of the posted code."
     },
     {
       title: "Attachments",
       body:
         "Unexpected files can be risky, especially when the sender asks you to enable content or act fast.",
-      example: "Example: Open this invoice zip and enable content today.",
+      example: "Open this invoice zip and enable content today.",
       action: "Confirm through a known contact path before opening the file."
     }
   ];
@@ -222,14 +224,31 @@
   }
 
   function navigate(route) {
+    const nextHash = `#${route}`;
+    if (window.location.hash === nextHash) {
+      render();
+      return;
+    }
     window.location.hash = route;
   }
 
   function setToast(message) {
     state.toast = message;
-    window.setTimeout(() => {
+    if (state.toastTimer) {
+      window.clearTimeout(state.toastTimer);
+    }
+
+    document.querySelectorAll(".toast").forEach((toast) => toast.remove());
+    const toast = document.createElement("div");
+    toast.className = "toast";
+    toast.setAttribute("role", "status");
+    toast.textContent = message;
+    app.append(toast);
+
+    state.toastTimer = window.setTimeout(() => {
       state.toast = "";
-      render();
+      state.toastTimer = null;
+      document.querySelectorAll(".toast").forEach((toast) => toast.remove());
     }, 2600);
   }
 
@@ -282,6 +301,20 @@
     );
   }
 
+  function getEvidenceItem(id) {
+    return storage.getEvidence().find((item) => item.id === id) || null;
+  }
+
+  function evidenceContext(item) {
+    return {
+      checkItem: item.checkItem,
+      result: item.result,
+      evidenceSummary: item.evidenceSummary,
+      evidenceItem: item,
+      casePacket: null
+    };
+  }
+
   function getLatestContext() {
     if (state.selectedCasePacketId) {
       const selectedPacket = storage.getCasePacket(state.selectedCasePacketId);
@@ -295,18 +328,27 @@
       }
     }
 
+    if (state.selectedEvidenceId) {
+      const selectedEvidence = getEvidenceItem(state.selectedEvidenceId);
+      if (selectedEvidence) {
+        return evidenceContext(selectedEvidence);
+      }
+      state.selectedEvidenceId = null;
+    }
+
     if (state.currentCheck && state.currentResult) {
       return {
         checkItem: state.currentCheck,
         result: state.currentResult,
         evidenceSummary: detection.summarizeForEvidence(state.currentCheck, state.currentResult),
+        evidenceItem: null,
         casePacket: null
       };
     }
 
     const latestEvidence = storage.getEvidence()[0];
     if (latestEvidence) {
-      return latestEvidence;
+      return evidenceContext(latestEvidence);
     }
 
     const latestPacket = storage.getCasePackets()[0];
@@ -315,6 +357,7 @@
         checkItem: latestPacket.checkItem,
         result: latestPacket.result,
         evidenceSummary: latestPacket.evidenceSummary,
+        evidenceItem: null,
         casePacket: latestPacket
       };
     }
@@ -749,15 +792,13 @@
       "Tell Verivae what happened",
       "Local judgment check",
       `
-        <form id="check-form" class="form-card judgment-form">
+        <form id="check-form" class="form-card judgment-form" novalidate>
           <label class="primary-input">
             Tell Verivae what happened
             <textarea
               name="content"
               rows="9"
-              minlength="8"
               placeholder="Paste a message, or describe a call, email, link, QR code, file, payment request, or person asking you to act..."
-              required
             ></textarea>
             <small>Write naturally. Include who contacted you, what they want, whether there is a deadline, and what feels off.</small>
           </label>
@@ -804,15 +845,16 @@
         </form>
 
         <section class="list-block">
-          <h2>Try a realistic sample</h2>
-          <div class="sample-list">
+          <h2>Examples of situations you can check</h2>
+          <div class="scenario-list compact-scenarios">
             ${sampleScenarios
+              .slice(0, 6)
               .map(
-                (sample, index) =>
-                  `<button class="sample-button" type="button" data-sample="${index}">
+                (sample) =>
+                  `<article class="scenario-card">
                     <strong>${escapeHtml(sample.title)}</strong>
-                    <span>${escapeHtml(sample.content.slice(0, 84))}...</span>
-                  </button>`
+                    <span>${escapeHtml(sample.content.slice(0, 96))}...</span>
+                  </article>`
               )
               .join("")}
           </div>
@@ -1157,7 +1199,7 @@
       return "Limited confidence means Verivae found a small amount of signal. Verify before acting.";
     }
 
-    return "Moderate confidence means Verivae found enough signal to explain a direction, but it is still not a guarantee.";
+    return "Moderate confidence means Verivae has enough detail to explain a direction, but it is still not a guarantee.";
   }
 
   function renderResult() {
@@ -1386,7 +1428,10 @@
                           </details>
                           <div class="card-actions">
                             <span>${escapeHtml(item.evidenceSummary?.savedReminder || "Review before sharing.")}</span>
-                            <button class="text-button danger-action" type="button" data-delete="${escapeHtml(item.id)}">Delete saved item</button>
+                            <div class="inline-actions">
+                              <button class="text-button" type="button" data-open-evidence="${escapeHtml(item.id)}">Review details</button>
+                              <button class="text-button danger-action" type="button" data-delete="${escapeHtml(item.id)}">Delete saved item</button>
+                            </div>
                           </div>
                         </article>
                       `
@@ -1407,6 +1452,134 @@
                 ${button("Open cases", "case")}
               </section>`
         }
+      `
+    );
+  }
+
+  function renderEvidenceDetail() {
+    const selected = state.selectedEvidenceId ? getEvidenceItem(state.selectedEvidenceId) : null;
+    const item = selected || storage.getEvidence()[0] || null;
+
+    if (!item) {
+      return pageShell(
+        "Evidence detail",
+        "Saved evidence",
+        `
+          <section class="empty-state">
+            <h2>No saved evidence selected</h2>
+            <p>Save a scam check first, then open it from the vault to review the original situation, risk result, warning signs, and next steps.</p>
+            ${button("Open vault", "vault", "primary")}
+            ${button("Run a check", "check")}
+          </section>
+        `
+      );
+    }
+
+    state.selectedEvidenceId = item.id;
+    state.selectedCasePacketId = null;
+
+    return pageShell(
+      "Evidence detail",
+      "Saved evidence",
+      `
+        <section class="notice">
+          This is a local prototype record saved in this browser. Review it before sharing, and ${sensitiveInfoReminder.toLowerCase()}
+        </section>
+
+        <section class="evidence-detail-hero ${levelClass(item.result.riskLevel)}">
+          <div>
+            <span class="result-kicker">Saved check</span>
+            <h2>${escapeHtml(item.evidenceSummary?.headline || item.result.riskLabel)}</h2>
+            <p>${escapeHtml(item.result.primaryGuidance)}</p>
+          </div>
+          <dl class="compact-meta">
+            <div>
+              <dt>Saved</dt>
+              <dd>${formatDate(item.savedAt)}</dd>
+            </div>
+            <div>
+              <dt>Checked</dt>
+              <dd>${formatDate(item.result.checkedAt)}</dd>
+            </div>
+            <div>
+              <dt>Risk</dt>
+              <dd>${escapeHtml(item.result.riskLabel)}</dd>
+            </div>
+            <div>
+              <dt>Confidence</dt>
+              <dd>${escapeHtml(item.result.confidence)}</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section class="plain-panel">
+          <h2>Original situation</h2>
+          <p class="evidence-situation">${escapeHtml(item.checkItem.content)}</p>
+          ${item.checkItem.notes ? `<p class="fine-print"><strong>Notes:</strong> ${escapeHtml(item.checkItem.notes)}</p>` : ""}
+          <p class="fine-print">${escapeHtml(contextInferenceNote(item.result))}</p>
+        </section>
+
+        <section class="case-insight-grid">
+          <article class="plain-panel">
+            <h2>Main warning signs</h2>
+            ${renderList(item.result.judgment.mainWarningSigns)}
+          </article>
+          <article class="plain-panel">
+            <h2>What not to do</h2>
+            ${renderList(item.result.doNotDo)}
+          </article>
+          <article class="plain-panel">
+            <h2>Next safest steps</h2>
+            ${renderList(item.result.safeVerificationSteps)}
+          </article>
+          <article class="plain-panel">
+            <h2>Still unclear</h2>
+            ${renderList(
+              item.result.missingInformation.length
+                ? item.result.missingInformation
+                : ["No specific gaps were flagged, but this record is still based only on the details entered."]
+            )}
+          </article>
+        </section>
+
+        <section class="plain-panel action-recommendations">
+          <h2>Use this evidence</h2>
+          <div class="decision-grid">
+            <article class="decision-card priority">
+              <div>
+                <strong>Create or open a case</strong>
+                <p>Turn this saved evidence into a local case workspace with recovery steps, notes, and helper summary.</p>
+              </div>
+              <button class="btn primary" type="button" data-action="save-case">Open case workspace</button>
+            </article>
+            <article class="decision-card">
+              <div>
+                <strong>Recovery steps</strong>
+                <p>Use this saved check as context for a practical recovery checklist.</p>
+              </div>
+              <button class="btn secondary" type="button" data-route="recovery">Open recovery</button>
+            </article>
+            <article class="decision-card">
+              <div>
+                <strong>Trusted helper</strong>
+                <p>Prepare a copyable summary. Verivae will not send it automatically.</p>
+              </div>
+              <button class="btn secondary" type="button" data-route="helper">Prepare summary</button>
+            </article>
+            <article class="decision-card">
+              <div>
+                <strong>Report prep</strong>
+                <p>Draft a local summary you can review before using official reporting channels yourself.</p>
+              </div>
+              <button class="btn secondary" type="button" data-route="report">Prepare report</button>
+            </article>
+          </div>
+        </section>
+      `,
+      `
+        <button class="btn primary" type="button" data-action="save-case">Open case workspace</button>
+        <button class="btn secondary" type="button" data-route="vault">Back to vault</button>
+        <button class="btn secondary" type="button" data-delete-evidence-route="${escapeHtml(item.id)}">Delete saved item</button>
       `
     );
   }
@@ -2007,7 +2180,7 @@
           <p>This MVP looks for common warning signs in text you provide: urgency, secrecy, unusual payments, code requests, remote access, suspicious links, impersonation, emergency pressure, job checks, marketplace overpayments, QR payments, attachments, and unrealistic money claims.</p>
         </section>
         <section class="plain-panel">
-          <h2>Practice habit</h2>
+          <h2>The main habit</h2>
           <p>When a request involves money, access, secrecy, urgency, or embarrassment, pause and verify through a channel you choose yourself.</p>
         </section>
       `
@@ -2105,6 +2278,7 @@
       result: state.currentResult,
       evidenceSummary: detection.summarizeForEvidence(state.currentCheck, state.currentResult)
     });
+    state.selectedEvidenceId = state.currentResult.id;
     setToast("Evidence saved locally.");
     navigate("vault");
   }
@@ -2124,6 +2298,7 @@
 
     storage.saveCasePacket(buildCasePacket(context));
     state.selectedCasePacketId = `case-${context.result.id}`;
+    state.selectedEvidenceId = null;
     setToast("Case saved locally.");
     navigate("case");
     render();
@@ -2207,6 +2382,7 @@
     state.currentResult = detection.assessScamRisk(checkItem);
     state.helperSummary = detection.buildHelperSummary(checkItem, state.currentResult);
     state.selectedCasePacketId = null;
+    state.selectedEvidenceId = null;
     navigate("result");
   }
 
@@ -2233,30 +2409,9 @@
     state.currentCheck = nextCheck;
     state.currentResult = detection.assessScamRisk(nextCheck);
     state.helperSummary = detection.buildHelperSummary(nextCheck, state.currentResult);
+    state.selectedEvidenceId = null;
     setToast("Verivae updated the judgment with your added details.");
     navigate("result");
-  }
-
-  function applySample(index) {
-    const sample = sampleScenarios[index];
-    if (!sample) {
-      return;
-    }
-
-    const form = document.querySelector("#check-form");
-    form.sourceType.value = sample.sourceType;
-    form.requestedAction.value = sample.requestedAction;
-    form.querySelectorAll("input[name='exposureActions']").forEach((input) => {
-      input.checked = false;
-    });
-    form.content.value = sample.content;
-    form.notes.value = `Sample: ${sample.title}`;
-    form.content.focus();
-  }
-
-  function startSample(index) {
-    state.pendingSampleIndex = index;
-    navigate("check");
   }
 
   function handleSettingsSubmit(form) {
@@ -2320,14 +2475,6 @@
       });
     }
 
-    document.querySelectorAll("[data-sample]").forEach((element) => {
-      element.addEventListener("click", () => applySample(Number(element.dataset.sample)));
-    });
-
-    document.querySelectorAll("[data-start-sample]").forEach((element) => {
-      element.addEventListener("click", () => startSample(Number(element.dataset.startSample)));
-    });
-
     document.querySelectorAll("[data-delete]").forEach((element) => {
       element.addEventListener("click", () => {
         const shouldDelete = window.confirm(
@@ -2335,15 +2482,43 @@
         );
         if (shouldDelete) {
           storage.deleteEvidence(element.dataset.delete);
+          if (state.selectedEvidenceId === element.dataset.delete) {
+            state.selectedEvidenceId = null;
+          }
           render();
           setToast("Saved evidence deleted.");
         }
       });
     });
 
+    document.querySelectorAll("[data-delete-evidence-route]").forEach((element) => {
+      element.addEventListener("click", () => {
+        const shouldDelete = window.confirm(
+          "Delete this saved item from this browser? This only removes the local prototype copy."
+        );
+        if (shouldDelete) {
+          storage.deleteEvidence(element.dataset.deleteEvidenceRoute);
+          if (state.selectedEvidenceId === element.dataset.deleteEvidenceRoute) {
+            state.selectedEvidenceId = null;
+          }
+          setToast("Saved evidence deleted.");
+          navigate("vault");
+        }
+      });
+    });
+
+    document.querySelectorAll("[data-open-evidence]").forEach((element) => {
+      element.addEventListener("click", () => {
+        state.selectedEvidenceId = element.dataset.openEvidence;
+        state.selectedCasePacketId = null;
+        navigate("evidence");
+      });
+    });
+
     document.querySelectorAll("[data-open-case]").forEach((element) => {
       element.addEventListener("click", () => {
         state.selectedCasePacketId = element.dataset.openCase;
+        state.selectedEvidenceId = null;
         state.caseSection = "overview";
         render();
       });
@@ -2352,6 +2527,7 @@
     document.querySelectorAll("[data-open-case-route]").forEach((element) => {
       element.addEventListener("click", () => {
         state.selectedCasePacketId = element.dataset.openCaseRoute;
+        state.selectedEvidenceId = null;
         state.caseSection = "overview";
         navigate("case");
       });
@@ -2396,6 +2572,7 @@
         if (shouldClear) {
           storage.clearEvidence();
           state.vaultFilter = "all";
+          render();
           setToast("All saved evidence cleared.");
         }
       });
@@ -2447,11 +2624,6 @@
       });
     }
 
-    if (routeName() === "check" && Number.isInteger(state.pendingSampleIndex)) {
-      const pending = state.pendingSampleIndex;
-      state.pendingSampleIndex = null;
-      applySample(pending);
-    }
   }
 
   function updateNav(activeRoute) {
@@ -2459,6 +2631,7 @@
       const isActive =
         item.dataset.nav === activeRoute ||
         (activeRoute === "result" && item.dataset.nav === "check") ||
+        (activeRoute === "evidence" && item.dataset.nav === "vault") ||
         (activeRoute === "case" && item.dataset.nav === "vault") ||
         (activeRoute === "report" && item.dataset.nav === "recovery") ||
         (activeRoute === "helper" && item.dataset.nav === "home") ||

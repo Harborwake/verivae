@@ -121,6 +121,21 @@ test("keeps low-signal requests cautious instead of guaranteeing safety", () => 
   assert.ok(result.doNotDo.some((item) => item.includes("passwords")));
 });
 
+test("does not flag ordinary no-link descriptions as suspicious links", () => {
+  const result = detection.assessScamRisk({
+    sourceType: "",
+    requestedAction: "",
+    content:
+      "My neighbor said the book club moved to Thursday at the library. No payment, links, passwords, codes, or account information are involved.",
+    notes: ""
+  });
+
+  assert.equal(result.riskLevel, detection.LEVELS.SAFE);
+  assert.notEqual(result.sourceType, "link");
+  assert.equal(result.detectedSignals.some((signal) => signal.id === "suspicious_link"), false);
+  assert.doesNotMatch(result.explanation, /definitely safe/i);
+});
+
 test("treats unfamiliar church donation calls as caution instead of likely safe", () => {
   const result = detection.assessScamRisk({
     sourceType: "",
