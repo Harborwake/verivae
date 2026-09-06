@@ -1,0 +1,22 @@
+{
+  "name": "Verivae",
+  "short_name": "Verivae",
+  "description": "Verivae helps people pause, assess scam risk, save evidence, and choose safer next steps.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#f7f1e7",
+  "theme_color": "#17283f",
+  "icons": [
+    {
+      "src": "assets/verivae-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "assets/verivae-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
