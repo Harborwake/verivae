@@ -290,6 +290,45 @@
     }
   };
 
+  const accountSafetyPlaybooks = {
+    account_access: {
+      label: "Account safety",
+      focus: "A request for codes, passwords, identity details, or login access can put an account at risk.",
+      steps: [
+        "Do not share login codes, reset links, passwords, recovery phrases, private keys, or bank login details.",
+        "Open the official app or website yourself and review account activity, passwords, sessions, and multi-factor authentication.",
+        "If you already shared a code or password, use the account provider's official recovery or security settings."
+      ]
+    },
+    bank_alert: {
+      label: "Bank alert safety",
+      focus: "Fake bank alerts often try to move you from fear into sharing codes, calling fake numbers, or changing account access.",
+      steps: [
+        "Do not read codes to a caller or use phone numbers from the alert.",
+        "Use the number on your card or statement, or open the official bank app yourself.",
+        "Ask the bank what account-protection steps are appropriate. Verivae cannot guarantee account recovery."
+      ]
+    },
+    remote_access: {
+      label: "Remote access safety",
+      focus: "Remote-access requests can expose accounts, files, and payment apps.",
+      steps: [
+        "Do not install remote-access apps from an unexpected call, email, message, or popup.",
+        "If you already allowed access, disconnect from the caller, close the app, and use trusted device-security support.",
+        "Change important account passwords only from official account settings, preferably from a trusted device."
+      ]
+    },
+    file_access: {
+      label: "File and attachment safety",
+      focus: "Unexpected files can be risky, especially when paired with urgency or instructions to enable content.",
+      steps: [
+        "Do not reopen unexpected files or enable macros/content.",
+        "Confirm the file through a known contact path before opening it.",
+        "Use trusted device-security guidance if you already opened the file or installed anything."
+      ]
+    }
+  };
+
   function normalize(value) {
     return String(value || "").trim();
   }
@@ -525,6 +564,73 @@
       focus: paymentRoutePlaybooks[route]?.focus || paymentRoutePlaybooks.unknown.focus,
       steps: paymentRoutePlaybooks[route]?.steps || paymentRoutePlaybooks.unknown.steps
     }));
+  }
+
+  function buildAccountSafetyNotes(result) {
+    if (!result) {
+      return [];
+    }
+
+    const notes = [];
+    const addNote = (id) => {
+      const note = accountSafetyPlaybooks[id];
+      if (note && !notes.some((item) => item.id === id)) {
+        notes.push({ id, ...note });
+      }
+    };
+
+    if (
+      hasSignal(result, "code_request") ||
+      hasSignal(result, "identity_verification") ||
+      hasSignal(result, "action_share_code") ||
+      hasSignal(result, "action_share_personal_info") ||
+      result.exposureActions?.includes("shared_code") ||
+      result.exposureActions?.includes("shared_info")
+    ) {
+      addNote("account_access");
+    }
+
+    if (hasSignal(result, "fake_bank_alert")) {
+      addNote("bank_alert");
+    }
+
+    if (
+      hasSignal(result, "remote_access") ||
+      hasSignal(result, "action_install_app") ||
+      result.exposureActions?.includes("installed_app")
+    ) {
+      addNote("remote_access");
+    }
+
+    if (
+      hasSignal(result, "attachment_pressure") ||
+      hasSignal(result, "action_open_attachment") ||
+      result.exposureActions?.includes("opened_file")
+    ) {
+      addNote("file_access");
+    }
+
+    return notes;
+  }
+
+  function hasPaymentRecoveryRisk(result) {
+    if (!result) {
+      return false;
+    }
+
+    return (
+      result.requestedAction === "send_money" ||
+      result.requestedAction === "buy_gift_cards" ||
+      result.exposureActions?.includes("paid_money") ||
+      hasSignal(result, "unusual_payment") ||
+      hasSignal(result, "action_send_money") ||
+      hasSignal(result, "action_buy_gift_cards") ||
+      hasSignal(result, "payment_destination_change") ||
+      hasSignal(result, "package_fee") ||
+      hasSignal(result, "fake_job_check") ||
+      hasSignal(result, "marketplace_overpayment") ||
+      hasSignal(result, "qr_payment")
+    );
   }
 
   function prepareAssessmentInput(item) {
@@ -1376,6 +1482,46 @@
       "Protect affected accounts",
       "Cut off remote access"
     ]);
+    const groups = [
+      {
+        title: "First moves",
+        description: "Do these before replying, paying, deleting, or clicking anything else.",
+        steps: baseSteps
+      },
+      {
+        title: acted.length ? "Because you already acted" : "If you already acted",
+        description: acted.length
+          ? "These steps match the action status Verivae noticed from your latest check."
+          : "Use these if you later realize you clicked, paid, shared information, opened a file, or installed something.",
+        steps: acted.length
+          ? situationSteps.filter((step) => alreadyActedTitles.has(step.title))
+          : [
+              {
+                title: "Come back and add what happened",
+                detail:
+                  "A safe yes/no summary is enough. Do not enter passwords, codes, full card numbers, bank login details, private keys, or recovery phrases.",
+                priority: "If needed"
+              },
+              {
+                title: "Use official support if money or access was involved",
+                detail:
+                  "Open the bank, payment app, account provider, or device settings yourself. Do not use links or phone numbers from the suspicious request.",
+                priority: "If needed"
+              }
+            ]
+      },
+      {
+        title: "Situation-specific steps",
+        description: "These are based on the warning signs Verivae found in the latest check.",
+        steps: situationSteps.filter((step) => !alreadyActedTitles.has(step.title))
+      },
+      {
+        title: "Follow-through",
+        description: "Use these to stay organized after the immediate risk is slowed down.",
+        steps: finalSteps
+      }
+    ];
+    const visibleSteps = groups.flatMap((group) => group.steps);
 
     return {
       headline: result
@@ -1387,47 +1533,10 @@
       exposureSummary: result?.exposureSummary || "Run a scam check to tailor this workspace to what happened.",
       exposureActions,
       exposureActionLabels: getExposureLabels(exposureActions),
-      paymentPlaybooks: result?.paymentPlaybooks || [],
-      groups: [
-        {
-          title: "First moves",
-          description: "Do these before replying, paying, deleting, or clicking anything else.",
-          steps: baseSteps
-        },
-        {
-          title: acted.length ? "Because you already acted" : "If you already acted",
-          description: acted.length
-            ? "These steps match the action status Verivae noticed from your latest check."
-            : "Use these if you later realize you clicked, paid, shared information, opened a file, or installed something.",
-          steps: acted.length
-            ? situationSteps.filter((step) => alreadyActedTitles.has(step.title))
-            : [
-                {
-                  title: "Come back and add what happened",
-                  detail:
-                    "A safe yes/no summary is enough. Do not enter passwords, codes, full card numbers, bank login details, private keys, or recovery phrases.",
-                  priority: "If needed"
-                },
-                {
-                  title: "Use official support if money or access was involved",
-                  detail:
-                    "Open the bank, payment app, account provider, or device settings yourself. Do not use links or phone numbers from the suspicious request.",
-                  priority: "If needed"
-                }
-              ]
-        },
-        {
-          title: "Situation-specific steps",
-          description: "These are based on the warning signs Verivae found in the latest check.",
-          steps: situationSteps.filter((step) => !alreadyActedTitles.has(step.title))
-        },
-        {
-          title: "Follow-through",
-          description: "Use these to stay organized after the immediate risk is slowed down.",
-          steps: finalSteps
-        }
-      ],
-      steps: [...baseSteps, ...situationSteps, ...finalSteps]
+      accountSafetyNotes: buildAccountSafetyNotes(result),
+      paymentPlaybooks: hasPaymentRecoveryRisk(result) ? result?.paymentPlaybooks || [] : [],
+      groups,
+      steps: visibleSteps
     };
   }
 

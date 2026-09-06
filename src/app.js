@@ -347,13 +347,27 @@
     return storage.getEvidence().find((item) => item.id === id) || null;
   }
 
-  function evidenceContext(item) {
+  function caseContext(packet, contextLabel = "Using latest saved case") {
+    return {
+      checkItem: packet.checkItem,
+      result: packet.result,
+      evidenceSummary: packet.evidenceSummary,
+      evidenceItem: null,
+      casePacket: packet,
+      contextKind: "saved_case",
+      contextLabel
+    };
+  }
+
+  function evidenceContext(item, contextLabel = "Using latest saved evidence") {
     return {
       checkItem: item.checkItem,
       result: item.result,
       evidenceSummary: item.evidenceSummary,
       evidenceItem: item,
-      casePacket: null
+      casePacket: null,
+      contextKind: "saved_evidence",
+      contextLabel
     };
   }
 
@@ -361,19 +375,14 @@
     if (state.selectedCasePacketId) {
       const selectedPacket = storage.getCasePacket(state.selectedCasePacketId);
       if (selectedPacket) {
-        return {
-          checkItem: selectedPacket.checkItem,
-          result: selectedPacket.result,
-          evidenceSummary: selectedPacket.evidenceSummary,
-          casePacket: selectedPacket
-        };
+        return caseContext(selectedPacket, "Using selected saved case");
       }
     }
 
     if (state.selectedEvidenceId) {
       const selectedEvidence = getEvidenceItem(state.selectedEvidenceId);
       if (selectedEvidence) {
-        return evidenceContext(selectedEvidence);
+        return evidenceContext(selectedEvidence, "Using latest saved evidence");
       }
       state.selectedEvidenceId = null;
     }
@@ -384,24 +393,20 @@
         result: state.currentResult,
         evidenceSummary: detection.summarizeForEvidence(state.currentCheck, state.currentResult),
         evidenceItem: null,
-        casePacket: null
+        casePacket: null,
+        contextKind: "latest_check",
+        contextLabel: "Using latest check"
       };
-    }
-
-    const latestEvidence = storage.getEvidence()[0];
-    if (latestEvidence) {
-      return evidenceContext(latestEvidence);
     }
 
     const latestPacket = storage.getCasePackets()[0];
     if (latestPacket) {
-      return {
-        checkItem: latestPacket.checkItem,
-        result: latestPacket.result,
-        evidenceSummary: latestPacket.evidenceSummary,
-        evidenceItem: null,
-        casePacket: latestPacket
-      };
+      return caseContext(latestPacket, "Using latest saved case");
+    }
+
+    const latestEvidence = storage.getEvidence()[0];
+    if (latestEvidence) {
+      return evidenceContext(latestEvidence, "Using latest saved evidence");
     }
 
     return null;
@@ -447,15 +452,15 @@
     };
   }
 
-  function getCaseProgress(packet) {
-    const steps = packet?.recoveryPlan?.steps || [];
+  function getCaseProgress(packet, stepsOverride = null) {
+    const steps = stepsOverride || packet?.recoveryPlan?.steps || [];
     const progress = packet?.taskProgress || {};
     const completed = steps.filter((_, index) => progress[String(index)]).length;
 
     return {
       completed,
       total: steps.length,
-      label: steps.length ? `${completed} of ${steps.length} recovery steps checked` : "No recovery steps available"
+      label: steps.length ? `${completed}/${steps.length} steps complete` : "No recovery steps available"
     };
   }
 
@@ -535,8 +540,8 @@
     return cases.filter((packet) => caseMatchesFilter(packet, filter)).length;
   }
 
-  function completedCaseTasks(packet) {
-    const steps = packet?.recoveryPlan?.steps || [];
+  function completedCaseTasks(packet, stepsOverride = null) {
+    const steps = stepsOverride || packet?.recoveryPlan?.steps || [];
     const progress = packet?.taskProgress || {};
     return steps.filter((_, index) => progress[String(index)]);
   }
@@ -994,6 +999,32 @@
       .join("");
   }
 
+  function renderAccountSafetyNotes(notes = []) {
+    if (!notes.length) {
+      return "";
+    }
+
+    return `
+      <section class="plain-panel">
+        <h2>Account safety notes</h2>
+        <p>These notes apply when the request involves codes, passwords, identity details, files, remote access, or account warnings.</p>
+        <div class="playbook-list">
+          ${notes
+            .map(
+              (note) => `
+                <article class="playbook-card">
+                  <span class="playbook-tag">${escapeHtml(note.label)}</span>
+                  <strong>${escapeHtml(note.focus)}</strong>
+                  ${renderList(note.steps)}
+                </article>
+              `
+            )
+            .join("")}
+        </div>
+      </section>
+    `;
+  }
+
   function renderPaymentPlaybooks(playbooks = []) {
     if (!playbooks.length) {
       return "";
@@ -1018,6 +1049,14 @@
         </div>
       </section>
     `;
+  }
+
+  function renderSafetyNotes(plan) {
+    if (!plan) {
+      return "";
+    }
+
+    return `${renderAccountSafetyNotes(plan.accountSafetyNotes)}${renderPaymentPlaybooks(plan.paymentPlaybooks)}`;
   }
 
   function renderRecoveryGroups(groups = [], casePacket = null) {
@@ -1047,7 +1086,7 @@
                             <input type="checkbox" ${
                               casePacket
                                 ? `data-case-task="${caseTaskIndex}" data-case-id="${escapeHtml(casePacket.id)}" ${checked ? "checked" : ""}`
-                                : `data-recovery-task="${groupIndex}-${taskIndex}"`
+                                : `data-recovery-task="${groupIndex}-${taskIndex}" disabled`
                             }>
                             <span>
                               <strong>${escapeHtml(task.title)}</strong>
@@ -1166,68 +1205,22 @@
   }
 
   function renderResultDecisions(result) {
-    const decisions = [
-      {
-        title: result.shouldUseRecovery ? "Open recovery steps" : "Recovery is optional",
-        body: result.shouldUseRecovery
-          ? "Use a calm checklist if you clicked, paid, shared a code, opened a file, installed an app, or feel unsure what happened."
-          : "This result does not automatically mean recovery is required, but the checklist is available if you already acted.",
-        action: "Open recovery",
-        route: "recovery",
-        priority: result.shouldUseRecovery
-      },
-      {
-        title: "Save a local case",
-        body:
-          "Create one local workspace with what happened, the risk judgment, recovery tasks, evidence notes, and helper summary.",
-        action: "Save case",
-        dataAction: "save-case",
-        priority: !result.shouldUseRecovery
-      },
-      {
-        title: result.shouldSaveEvidence ? "Save evidence" : "Evidence is optional",
-        body: result.shouldSaveEvidence
-          ? "Save a local record only after removing passwords, codes, full card numbers, bank login details, private keys, and recovery phrases."
-          : "Saving is optional. Use it only if you want a local record of the check.",
-        action: "Save evidence",
-        dataAction: "save-evidence",
-        priority: false
-      },
-      {
-        title: "Ask a trusted helper",
-        body:
-          "Prepare a copyable summary you can review first. Verivae does not send it automatically.",
-        action: "Prepare summary",
-        route: "helper",
-        priority: false
-      }
-    ];
-
     return `
       <section class="plain-panel action-recommendations">
-        <div class="section-title-row">
-          <h2>What to do next</h2>
-          <button class="text-button" type="button" data-route="check">Run another check</button>
+        <h2>Choose a safe next step</h2>
+        <p>${
+          result.shouldUseRecovery
+            ? "Start with recovery if you already clicked, paid, shared a code, opened a file, installed an app, or feel unsure what happened."
+            : "Save a local record only if it is useful, or run another check when you have more details."
+        }</p>
+        <div class="hero-actions">
+          <button class="btn ${result.shouldSaveEvidence ? "primary" : "secondary"}" type="button" data-action="save-evidence">Save evidence</button>
+          <button class="btn ${result.shouldUseRecovery ? "primary" : "secondary"}" type="button" data-route="recovery">Open recovery</button>
+          <button class="btn secondary" type="button" data-route="helper">Prepare helper summary</button>
+          <button class="btn secondary" type="button" data-route="check">Run another check</button>
         </div>
-        <div class="decision-grid">
-          ${decisions
-            .map(
-              (decision) => `
-                <article class="decision-card ${decision.priority ? "priority" : ""}">
-                  <div>
-                    <strong>${escapeHtml(decision.title)}</strong>
-                    <p>${escapeHtml(decision.body)}</p>
-                  </div>
-                  ${
-                    decision.dataAction
-                      ? `<button class="btn ${decision.priority ? "primary" : "secondary"}" type="button" data-action="${decision.dataAction}">${escapeHtml(decision.action)}</button>`
-                      : `<button class="btn ${decision.priority ? "primary" : "secondary"}" type="button" data-route="${decision.route}">${escapeHtml(decision.action)}</button>`
-                  }
-                </article>
-              `
-            )
-            .join("")}
-        </div>
+        <p class="fine-print">Saved evidence stays in this browser. Helper summaries are copy-only; Verivae does not send them automatically.</p>
+        <button class="text-button" type="button" data-route="education">Learn how Verivae reads warning signs</button>
       </section>
     `;
   }
@@ -1322,18 +1315,13 @@
           ${renderList(result.recommendedNextActions)}
         </section>
 
-        ${renderPaymentPlaybooks(result.paymentPlaybooks)}
+        ${renderSafetyNotes(detection.buildRecoveryPlan(result))}
 
         ${renderResultDecisions(result)}
 
         ${renderGuidedReview(result)}
 
         ${renderMissingInformation(result)}
-      `,
-      `
-        <button class="btn primary" type="button" data-action="save-case">Save local case</button>
-        <button class="btn secondary" type="button" data-route="recovery">Open recovery</button>
-        <button class="btn secondary" type="button" data-route="check">Run another check</button>
       `
     );
   }
@@ -1950,13 +1938,22 @@
   function renderRecovery() {
     const context = getLatestContext();
     const plan = detection.buildRecoveryPlan(context?.result);
-    const casePacket = context?.casePacket || null;
-    const caseProgress = casePacket ? getCaseProgress(casePacket) : null;
-    const doneTasks = casePacket ? completedCaseTasks(casePacket) : [];
+    const savedCasePacket = context?.casePacket || null;
+    const casePacket = savedCasePacket ? { ...savedCasePacket, recoveryPlan: plan } : null;
+    const caseProgress = getCaseProgress(
+      {
+        recoveryPlan: plan,
+        taskProgress: savedCasePacket?.taskProgress || {}
+      },
+      plan.steps
+    );
+    const doneTasks = savedCasePacket ? completedCaseTasks(savedCasePacket, plan.steps) : [];
+    const contextLabel = context?.contextLabel || "No saved case or check yet";
+    const progressSaved = Boolean(savedCasePacket);
 
     return pageShell(
-      casePacket ? "Recovery for this case" : "Recovery workspace",
-      casePacket ? "Continue saved case" : "After something may have gone wrong",
+      context ? "Recovery workspace" : "Recovery workspace",
+      context ? contextLabel : "After something may have gone wrong",
       `
         <section class="notice">
           Verivae can help organize recovery steps, but it cannot guarantee refunds, account recovery, law-enforcement action, or device cleanup.
@@ -1970,12 +1967,22 @@
           </div>
           <div class="recovery-status-strip">
             <article>
-              <strong>${casePacket ? caseStatusLabel(casePacket) : "No saved case selected"}</strong>
-              <span>${casePacket ? "Current case status" : "Run or save a check to track progress here."}</span>
+              <strong>${escapeHtml(contextLabel)}</strong>
+              <span>${
+                savedCasePacket
+                  ? `Current case status: ${escapeHtml(caseStatusLabel(savedCasePacket))}.`
+                  : context
+                    ? "Save a local case if you want checklist tracking."
+                    : "Run a scam check first to tailor this workspace."
+              }</span>
             </article>
             <article>
-              <strong>${caseProgress ? `${caseProgress.completed}/${caseProgress.total || 0}` : "0/0"}</strong>
-              <span>${caseProgress ? "Recovery steps checked" : "Checklist progress is not saved yet."}</span>
+              <strong>${escapeHtml(caseProgress.label)}</strong>
+              <span>${
+                progressSaved
+                  ? "Checklist progress is saved in this local case."
+                  : "Checklist progress is not saved yet."
+              }</span>
             </article>
           </div>
         </section>
@@ -1983,6 +1990,7 @@
           context
             ? `<section class="plain-panel">
                 <h2>${casePacket ? "Case context" : "Latest check context"}</h2>
+                <p class="fine-print"><strong>${escapeHtml(contextLabel)}.</strong></p>
                 <p>${escapeHtml(casePacket?.caseTitle || context.evidenceSummary?.headline || context.result.riskLabel)}</p>
                 <dl class="evidence-meta">
                   ${
@@ -2036,7 +2044,7 @@
               </section>`
             : ""
         }
-        ${renderPaymentPlaybooks(plan.paymentPlaybooks)}
+        ${renderSafetyNotes(plan)}
         <section class="plain-panel">
           <h2>Use this workspace calmly</h2>
           <p>Start with the steps that prevent more loss: stop contact, avoid sending more money or codes, preserve evidence, and contact official providers yourself.</p>
@@ -2050,8 +2058,13 @@
       context
         ? `
           ${
+            !savedCasePacket
+              ? `<button class="btn primary" type="button" data-action="save-case">Save local case</button>`
+              : ""
+          }
+          ${
             state.currentCheck && state.currentResult
-              ? `<button class="btn primary" type="button" data-action="save-evidence">Save latest check</button>`
+              ? `<button class="btn secondary" type="button" data-action="save-evidence">Save latest check</button>`
               : ""
           }
           <button class="btn secondary" type="button" data-route="case">Open cases</button>

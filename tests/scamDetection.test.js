@@ -588,6 +588,36 @@ test("builds situation-aware recovery steps from warning signs", () => {
   assert.ok(plan.steps.some((step) => step.detail.includes("Verivae does not submit reports")));
 });
 
+test("recovery plan counts visible checklist steps and separates account notes from payment notes", () => {
+  const result = detection.assessScamRisk({
+    sourceType: "",
+    requestedAction: "",
+    content:
+      "A caller says they are from my bank fraud department and need the one-time verification code to stop an unauthorized charge."
+  });
+  const plan = detection.buildRecoveryPlan(result);
+  const visibleSteps = plan.groups.flatMap((group) => group.steps);
+
+  assert.equal(plan.steps.length, visibleSteps.length);
+  assert.ok(plan.accountSafetyNotes.some((note) => note.label === "Account safety"));
+  assert.ok(plan.accountSafetyNotes.some((note) => note.label === "Bank alert safety"));
+  assert.equal(plan.paymentPlaybooks.length, 0);
+});
+
+test("recovery plan shows payment notes when payment movement is part of the risk", () => {
+  const result = detection.assessScamRisk({
+    sourceType: "",
+    requestedAction: "",
+    content:
+      "A package text says my delivery is stuck and I need to pay a redelivery fee today through a short link."
+  });
+  const plan = detection.buildRecoveryPlan(result);
+
+  assert.ok(plan.paymentPlaybooks.length > 0);
+  assert.ok(plan.paymentPlaybooks.some((playbook) => /payment/i.test(playbook.label) || playbook.route === "unknown"));
+  assert.equal(plan.steps.length, plan.groups.flatMap((group) => group.steps).length);
+});
+
 test("recovery plan uses inferred natural-language risk context", () => {
   const result = detection.assessScamRisk({
     sourceType: "",
