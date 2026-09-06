@@ -7,8 +7,10 @@
   const defaultSettings = {
     saveEvidenceLocally: true,
     helperReviewReminder: true,
-    safetyNudges: true
+    safetyNudges: true,
+    themeMode: "light"
   };
+  const themeModes = new Set(["light", "dark", "system"]);
 
   function readJson(key, fallback) {
     if (memoryStore[key]) {
@@ -86,12 +88,20 @@
   }
 
   function getSettings() {
-    return { ...defaultSettings, ...readJson(settingsKey, defaultSettings) };
+    return normalizeSettings(readJson(settingsKey, defaultSettings));
   }
 
   function saveSettings(settings) {
-    const next = { ...defaultSettings, ...settings };
+    const next = normalizeSettings(settings);
     writeJson(settingsKey, next);
+    return next;
+  }
+
+  function normalizeSettings(settings) {
+    const next = { ...defaultSettings, ...(settings || {}) };
+    if (!themeModes.has(next.themeMode)) {
+      next.themeMode = defaultSettings.themeMode;
+    }
     return next;
   }
 

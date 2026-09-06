@@ -756,6 +756,27 @@ test("local storage saves, filters, and deletes prototype evidence data", () => 
   assert.equal(storage.getEvidence().length, 0);
 });
 
+test("local storage persists theme preference safely", () => {
+  const storage = require("../src/storage.js");
+
+  assert.equal(storage.getSettings().themeMode, "light");
+
+  const darkSettings = storage.saveSettings({
+    saveEvidenceLocally: true,
+    helperReviewReminder: false,
+    safetyNudges: true,
+    themeMode: "dark"
+  });
+  assert.equal(darkSettings.themeMode, "dark");
+  assert.equal(storage.getSettings().themeMode, "dark");
+
+  const systemSettings = storage.saveSettings({ themeMode: "system" });
+  assert.equal(systemSettings.themeMode, "system");
+
+  const sanitizedSettings = storage.saveSettings({ themeMode: "neon" });
+  assert.equal(sanitizedSettings.themeMode, "light");
+});
+
 test("local storage saves, updates, reads, and deletes case packets", () => {
   const storage = require("../src/storage.js");
   storage.clearCasePackets();

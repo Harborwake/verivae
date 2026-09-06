@@ -219,6 +219,21 @@
     resolved: "Resolved"
   };
 
+  const themeModeOptions = {
+    light: {
+      label: "Light",
+      description: "Warm cream background with soft sage and gold accents."
+    },
+    dark: {
+      label: "Dark",
+      description: "Warm dark colors with gentle contrast for lower-light use."
+    },
+    system: {
+      label: "Use device setting",
+      description: "Follow this device's current light or dark appearance."
+    }
+  };
+
   function routeName() {
     return (window.location.hash || "#home").replace("#", "") || "home";
   }
@@ -227,9 +242,36 @@
     const nextHash = `#${route}`;
     if (window.location.hash === nextHash) {
       render();
+      scrollToScreenTop();
       return;
     }
     window.location.hash = route;
+  }
+
+  function scrollToScreenTop() {
+    window.scrollTo({
+      top: 0,
+      left: 0,
+      behavior: "auto"
+    });
+  }
+
+  function resolveTheme(mode) {
+    if (mode === "system") {
+      const systemThemeQuery = window.matchMedia?.("(prefers-color-scheme: dark)");
+      return systemThemeQuery?.matches ? "dark" : "light";
+    }
+
+    return mode === "dark" ? "dark" : "light";
+  }
+
+  function applyTheme(settings = storage.getSettings()) {
+    const mode = themeModeOptions[settings.themeMode] ? settings.themeMode : "light";
+    const resolved = resolveTheme(mode);
+
+    document.documentElement.dataset.theme = resolved;
+    document.documentElement.dataset.themePreference = mode;
+    document.documentElement.style.colorScheme = resolved;
   }
 
   function setToast(message) {
@@ -797,7 +839,7 @@
             Tell Verivae what happened
             <textarea
               name="content"
-              rows="9"
+              rows="7"
               placeholder="Paste a message, or describe a call, email, link, QR code, file, payment request, or person asking you to act..."
             ></textarea>
             <small>Write naturally. Include who contacted you, what they want, whether there is a deadline, and what feels off.</small>
@@ -2215,6 +2257,27 @@
             <h2>Prototype preferences</h2>
             <p class="fine-print">These settings only affect this local browser prototype.</p>
           </div>
+
+          <fieldset class="theme-choice-group">
+            <legend>Appearance</legend>
+            <p>Choose the color mode that feels easiest to read. Appearance saves as soon as you choose it. Light stays the default.</p>
+            <div class="theme-options">
+              ${Object.entries(themeModeOptions)
+                .map(
+                  ([value, option]) => `
+                    <label class="theme-option">
+                      <input type="radio" name="themeMode" value="${value}" ${settings.themeMode === value ? "checked" : ""}>
+                      <span>
+                        <strong>${escapeHtml(option.label)}</strong>
+                        <small>${escapeHtml(option.description)}</small>
+                      </span>
+                    </label>
+                  `
+                )
+                .join("")}
+            </div>
+          </fieldset>
+
           <label class="toggle-row">
             <span>
               <strong>Save evidence locally</strong>
@@ -2416,12 +2479,25 @@
 
   function handleSettingsSubmit(form) {
     const formData = new FormData(form);
-    storage.saveSettings({
+    const nextSettings = storage.saveSettings({
       saveEvidenceLocally: formData.has("saveEvidenceLocally"),
       helperReviewReminder: formData.has("helperReviewReminder"),
-      safetyNudges: formData.has("safetyNudges")
+      safetyNudges: formData.has("safetyNudges"),
+      themeMode: formData.get("themeMode")
     });
+    applyTheme(nextSettings);
+    render();
     setToast("Settings saved.");
+  }
+
+  function handleThemeModeChange(input) {
+    const nextSettings = storage.saveSettings({
+      ...storage.getSettings(),
+      themeMode: input.value
+    });
+    applyTheme(nextSettings);
+    render();
+    setToast(`${themeModeOptions[nextSettings.themeMode].label} appearance saved.`);
   }
 
   async function copyHelperSummary() {
@@ -2616,6 +2692,10 @@
       element.addEventListener("click", copyReportDraft);
     });
 
+    document.querySelectorAll("input[name='themeMode']").forEach((element) => {
+      element.addEventListener("change", () => handleThemeModeChange(element));
+    });
+
     const settingsForm = document.querySelector("#settings-form");
     if (settingsForm) {
       settingsForm.addEventListener("submit", (event) => {
@@ -2653,6 +2733,16 @@
     app.focus({ preventScroll: true });
   }
 
-  window.addEventListener("hashchange", render);
+  window.addEventListener("hashchange", () => {
+    render();
+    scrollToScreenTop();
+  });
+  const systemThemeQuery = window.matchMedia?.("(prefers-color-scheme: dark)");
+  systemThemeQuery?.addEventListener("change", () => {
+    if (storage.getSettings().themeMode === "system") {
+      applyTheme();
+    }
+  });
+  applyTheme();
   render();
 })();
