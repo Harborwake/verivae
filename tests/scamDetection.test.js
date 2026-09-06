@@ -487,6 +487,7 @@ test("ordinary and unclear examples avoid false confidence", () => {
   });
 
   assert.equal(ordinary.riskLevel, detection.LEVELS.SAFE);
+  assert.equal(ordinary.confidence, "Limited");
   assert.match(ordinary.explanation, /not a guarantee/i);
 
   const unclear = detection.assessScamRisk({

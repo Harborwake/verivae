@@ -1045,7 +1045,11 @@
     const followUpQuestions = buildFollowUpQuestions(assessmentInput, level, signals);
     const hasSensitiveContent = sensitivePatterns.some((pattern) => pattern.test(content));
     const confidence =
-      level === LEVELS.UNKNOWN ? "Low" : signals.length >= 3 || content.length > 80 ? "Moderate" : "Limited";
+      level === LEVELS.UNKNOWN
+        ? "Low"
+        : signals.length >= 3 || (signals.length >= 2 && content.length > 80)
+          ? "Moderate"
+          : "Limited";
     const primaryGuidance = buildPrimaryGuidance(level);
     const reasoningSummary = buildReasoningSummary(level, signals);
     const exposureSummary = buildExposureSummary(exposureActions);

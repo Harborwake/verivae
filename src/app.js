@@ -1238,7 +1238,7 @@
     }
 
     if (confidence === "Limited") {
-      return "Limited confidence means Verivae found a small amount of signal. Verify before acting.";
+      return "Limited confidence means Verivae has only a small amount of useful context. Verify before acting.";
     }
 
     return "Moderate confidence means Verivae has enough detail to explain a direction, but it is still not a guarantee.";

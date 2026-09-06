@@ -12,51 +12,51 @@ A user should be able to open Verivae, check a suspicious message or situation, 
 
 ## App Shell
 
-Status: Not started. Build a mobile-first layout with clear navigation. The main action should be manual scam check. Secondary areas should include evidence vault, recovery workspace, trusted helper, education, and settings.
+Status: Implemented in the local MVP prototype. Continue refining polish and accessibility before production. The current app uses a mobile-first layout with manual scam check as the main action and evidence vault, recovery workspace, trusted helper, education, and settings as secondary areas.
 
 ## Home Screen
 
-Status: Not started. The home screen should make the safest next action obvious. It should feel calm and protective. It should not overload the user with too many choices.
+Status: Implemented in the local MVP prototype. The home screen makes the manual scam check prominent, summarizes saved evidence and active cases, and keeps the tone calm and protective.
 
 ## Manual Scam Check
 
-Status: Not started. The user should be able to paste or type suspicious text, links, payment requests, emails, messages, or a short situation summary. The screen should ask what the user is being asked to do.
+Status: Implemented in the local MVP prototype. The user can type or paste a suspicious message, link, payment request, email, call summary, QR situation, file concern, or short situation summary. Optional helper fields add context without being required.
 
 ## Detection Logic
 
-Status: Not started. Use simulated rule-based logic for MVP 1. Look for urgency, secrecy, money pressure, gift cards, crypto, wire transfers, code requests, remote access, suspicious links, impersonation, attachment pressure, and pressure not to tell anyone.
+Status: Implemented in the local MVP prototype. The current logic is rule-based and simulated for MVP 1. It looks for urgency, secrecy, money pressure, gift cards, crypto, wire transfers, code requests, remote access, suspicious links, impersonation, attachment pressure, relationship pressure, marketplace patterns, fake jobs, QR requests, and pressure not to tell anyone.
 
 ## Result Screen
 
-Status: Not started. Show a risk level, reasons, what not to do, safe verification steps, and recommended next action. Include a not-enough-information result when the app cannot judge safely.
+Status: Implemented in the local MVP prototype. Results show risk level, confidence, reasons, warning signs, what not to do, safe verification steps, missing information, and recommended next actions. The app includes a not-enough-information result and avoids absolute safety claims.
 
 ## Evidence Vault
 
-Status: Not started. Let the user save a check result with original content, risk level, reasons, user notes, and recovery suggestions. For MVP 1, this should be prototype-only local storage unless a backend is approved later. The interface should warn users not to save passwords, one-time codes, full card numbers, bank login details, private keys, recovery phrases, or other sensitive secrets.
+Status: Implemented in the local MVP prototype. Users can opt in to saving a local evidence record with original check details, risk level, reasons, user notes, recovery suggestions, and saved date/time. Evidence can be filtered and deleted. The interface warns users not to save passwords, one-time codes, full card numbers, bank login details, private keys, recovery phrases, or other sensitive secrets.
 
 ## Recovery Workspace
 
-Status: Not started. Provide a basic recovery checklist for suspected scam situations. Include stop communication, avoid sending more money, preserve evidence, contact the bank or payment provider, change passwords, strengthen account security, and ask a trusted person for help.
+Status: Implemented in the local MVP prototype. Recovery uses the latest check or selected saved case when available, shows a practical checklist, supports local case notes/status/progress, and includes steps such as stop communication, avoid sending more money, preserve evidence, contact official bank or payment channels, change passwords, strengthen account security, and ask a trusted person for help.
 
 ## Trusted Helper Summary
 
-Status: Not started. Generate a simple summary a user can show to a trusted person. The summary should explain what happened, what seems risky, what the user is being asked to do, and what kind of help is needed.
+Status: Implemented in the local MVP prototype. The helper flow creates a copyable summary from the latest check or selected case. It explains what happened, risk level, confidence, warning signs, safest next steps, unclear details, and sharing cautions. Verivae does not send the summary automatically.
 
 ## Education Area
 
-Status: Not started. Add short lessons or cards for common scam patterns. The education area should be connected to the same warning signs used in the scam check.
+Status: Implemented in the local MVP prototype. The education area includes short, beginner-friendly scam pattern cards connected to the same warning signs used in the scam check.
 
 ## Settings and Privacy
 
-Status: Not started. Include clear privacy boundaries, data controls, future permission explanations, notification preferences, and product claims limits. The first version should not require Gmail, Messages, bank, payment, or device permissions.
+Status: Implemented in the local MVP prototype. Settings explain local storage, sensitive information boundaries, data controls, theme choice, and product claims limits. The first version does not require Gmail, Messages, bank, payment, contact, cloud, or device permissions.
 
 ## Empty and Error States
 
-Status: Not started. Add helpful empty states for no saved evidence, no recovery items, and no helper summary yet. Add error states when input is too short, a check cannot be completed, or the app needs more information.
+Status: Implemented in the local MVP prototype. Empty states guide users toward running a scam check first, saving evidence, or opening recovery when appropriate. The check flow handles short or unclear input with missing-information guidance.
 
 ## Sample Test Cases
 
-Status: Not started. Test a gift card request, bank code request, romance emergency request, fake package fee, crypto investment pitch, QR payment request, remote access request, family emergency from an unknown number, suspicious attachment, and secrecy-pressure message.
+Status: Implemented and expanding. Automated tests and the scenario lab cover gift card requests, bank code requests, romance and emergency money requests, fake package fees, crypto investment pitches, QR payment requests, remote access requests, family emergency claims, suspicious attachments, secrecy pressure, ordinary low-risk messages, and unclear messages.
 
 ## Out of Scope for MVP 1
 

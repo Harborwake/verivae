@@ -31,6 +31,7 @@ Verivae should help users pause, understand risk, preserve evidence, and choose 
 - Planning docs are in the `docs` folder.
 - MVP build Issues and future backlog Issues are in the GitHub Issues tab.
 - MVP 1 app shell code now lives in `index.html`, `src/`, and `tests/`.
+- App icon and install metadata live in `assets/` and `site.webmanifest`.
 
 ## Run the MVP
 
@@ -51,6 +52,7 @@ npm run scenarios
 If `npm` is unavailable on PATH, the scenario lab can be run with:
 
 ```bash
+node tests/scamDetection.test.js
 node tests/runScenarioLab.js
 ```
 

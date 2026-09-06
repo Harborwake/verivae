@@ -1431,7 +1431,7 @@ Rule 10: Keep all disclaimers short and understandable.
 
 first app version Design Decision
 
-The The first app version should be a simple, guided review tool with a rule-based risk engine. It should not start with paid AI, bank integrations, app stores, accounts, or cloud sync.
+The first app version should be a simple, guided review tool with a rule-based risk engine. It should not start with paid AI, bank integrations, app stores, accounts, or cloud sync.
 
 The best first version is:
 
